@@ -64,6 +64,10 @@ describe('DeadLetterQueueService', () => {
         { provide: getQueueToken('data-sync'), useValue: { add: jest.fn() } },
         { provide: getQueueToken('analytics'), useValue: { add: jest.fn() } },
         {
+          provide: getQueueToken('video-processing'),
+          useValue: { add: jest.fn() },
+        },
+        {
           provide: ErrorNotificationService,
           useValue: errorNotificationService,
         },

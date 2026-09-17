@@ -31,6 +31,7 @@ import { RecordPaymentDto } from './dto/record-payment.dto';
 import { TerminateAgreementDto } from './dto/terminate-agreement.dto';
 import { QueryAgreementsDto } from './dto/query-agreements.dto';
 import { RenewAgreementDto } from './dto/renew-agreement.dto';
+import { SignAgreementDto } from './dto/sign-agreement.dto';
 import { QueryAgreementFeesDto } from './dto/query-agreement-fees.dto';
 import { AuditLogInterceptor } from '../audit/interceptors/audit-log.interceptor';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -162,6 +163,25 @@ export class AgreementsController {
     @Body() terminateDto: TerminateAgreementDto,
   ) {
     return await this.agreementsService.terminate(id, terminateDto);
+  }
+
+  @ApiResponse({ status: 200, description: 'Signed' })
+  @ApiOperation({
+    summary: 'Sign agreement',
+    description:
+      'Transitions the agreement to SIGNED. Pass idempotencyKey to safely retry on client timeout or network drop — ' +
+      'the original result is returned for the same agreement+key instead of re-running side effects, for 7 days.',
+  })
+  @Post(':id/sign')
+  @AuditLog({
+    action: AuditAction.UPDATE,
+    entityType: 'RentAgreement',
+    level: AuditLevel.INFO,
+    includeNewValues: true,
+  })
+  @HttpCode(HttpStatus.OK)
+  async sign(@Param('id') id: string, @Body() dto: SignAgreementDto) {
+    return await this.agreementsService.sign(id, dto);
   }
 
   @ApiResponse({ status: 201, description: 'Created' })

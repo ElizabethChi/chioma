@@ -38,6 +38,18 @@ export {
 } from './use-transactions';
 
 export {
+  useSavedSearches,
+  useCreateSavedSearch,
+  useDeleteSavedSearch,
+  toSavedSearchFilters,
+} from './use-saved-searches';
+export type {
+  SavedSearch,
+  SavedSearchFilters,
+  CreateSavedSearchPayload,
+} from './use-saved-searches';
+
+export {
   useAnchorTransactions,
   useAnchorTransaction,
   useAnchorTransactionStats,
@@ -93,6 +105,9 @@ export {
 } from './use-agreements';
 
 export type { AgreementSummary, AgreementResponse } from './use-agreements';
+
+export { useAvailability } from './use-availability';
+export type { AvailabilityDay } from './use-availability';
 
 export { useLandlordPropertyAnalytics } from './use-property-analytics';
 

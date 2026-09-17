@@ -127,6 +127,14 @@ export class PaymentService {
       throw new NotFoundException('Payment method not found');
     }
 
+    // Perform fraud check before allowing payment to proceed
+    await this.fraudHooksService.checkTransactionBeforeRecording({
+      userId,
+      amount: dto.amount,
+      currency: 'NGN',
+      paymentMethod: paymentMethod.paymentType ?? undefined,
+    });
+
     // Calculate fees (mock: 2% fee)
     const transactionFee = dto.amount * 0.02;
     const netAmount = dto.amount - transactionFee;

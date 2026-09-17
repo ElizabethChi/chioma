@@ -17,9 +17,11 @@ import { RecordPaymentDto } from './dto/record-payment.dto';
 import { TerminateAgreementDto } from './dto/terminate-agreement.dto';
 import { QueryAgreementsDto } from './dto/query-agreements.dto';
 import { RenewAgreementDto } from './dto/renew-agreement.dto';
+import { SignAgreementDto } from './dto/sign-agreement.dto';
 import { AuditService } from '../audit/audit.service';
 import { ReviewPromptService } from '../reviews/review-prompt.service';
 import { ChiomaContractService } from '../stellar/services/chioma-contract.service';
+import { AgreementNftService } from './agreement-nft.service';
 import { BlockchainSyncService } from './blockchain-sync.service';
 import { EscrowIntegrationService } from './escrow-integration.service';
 import { TemplateRenderingService } from './template-rendering.service';
@@ -45,6 +47,7 @@ export class AgreementsService {
     private readonly auditService: AuditService,
     private readonly reviewPromptService: ReviewPromptService,
     private readonly chiomaContract: ChiomaContractService,
+    private readonly agreementNftService: AgreementNftService,
     private readonly blockchainSync: BlockchainSyncService,
     private readonly escrowIntegration: EscrowIntegrationService,
     private readonly templateService: TemplateRenderingService,
@@ -249,6 +252,36 @@ export class AgreementsService {
     return saved;
   }
 
+  @Locked({ key: (id: string) => `agreement:sign:${id}`, ttlMs: 10000 })
+  @Idempotent({
+    ttlMs: 604_800_000,
+    key: (id: string, dto: SignAgreementDto) =>
+      dto?.idempotencyKey ? `agreement:sign:${id}:${dto.idempotencyKey}` : null,
+    requireKey: false,
+  })
+  async sign(id: string, _dto: SignAgreementDto) {
+    const agreement = await this.findOne(id);
+    const oldStatus = agreement.status;
+    this.stateService.validateTransition(
+      agreement.status,
+      AgreementStatus.SIGNED,
+    );
+    agreement.status = AgreementStatus.SIGNED;
+    const saved = await this.agreementRepository.save(agreement);
+
+    this.eventEmitter.emit(
+      'agreement.status.changed',
+      new AgreementStatusChangedEvent(
+        id,
+        oldStatus,
+        AgreementStatus.SIGNED,
+        'Agreement signed',
+      ),
+    );
+
+    return saved;
+  }
+
   async getFees(id: string, daysPastDue?: number) {
     const agreement = await this.findOne(id);
     const rent = Number(agreement.monthlyRent);
@@ -307,6 +340,21 @@ export class AgreementsService {
         'Agreement terminated',
       ),
     );
+
+    try {
+      await this.agreementNftService.burnNftForAgreement(
+        id,
+        'AgreementTerminated',
+      );
+    } catch (error) {
+      this.logger.error(
+        `Failed to burn NFT obligation for terminated agreement ${id}`,
+        error,
+      );
+    }
+
+    await this.promptLeaseReviewSafely(id);
+
     return saved;
   }
 
@@ -364,7 +412,27 @@ export class AgreementsService {
       'agreement.status.changed',
       new AgreementStatusChangedEvent(id, oldStatus, newStatus, reason),
     );
+
+    if (newStatus === AgreementStatus.EXPIRED) {
+      await this.promptLeaseReviewSafely(id);
+    }
+
     return saved;
+  }
+
+  /**
+   * Sends the lease-end review prompt without letting a notification
+   * failure block the status transition that triggered it.
+   */
+  private async promptLeaseReviewSafely(agreementId: string): Promise<void> {
+    try {
+      await this.reviewPromptService.promptForLeaseReview(agreementId);
+    } catch (error) {
+      this.logger.error(
+        `Failed to send lease review prompt for agreement ${agreementId}`,
+        error,
+      );
+    }
   }
 
   async generateAgreementPdf(id: string): Promise<Buffer> {

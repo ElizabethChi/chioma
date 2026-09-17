@@ -82,6 +82,8 @@ const mockIdempotencyService = {
 
 const mockFraudHooksService = {
   onPaymentRecorded: jest.fn().mockResolvedValue(undefined),
+  checkTransactionBeforeRecording: jest.fn().mockResolvedValue(undefined),
+  checkListingBeforePublishing: jest.fn().mockResolvedValue(undefined),
 };
 
 describe('PaymentService', () => {

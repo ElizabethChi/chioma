@@ -53,6 +53,7 @@ describe('Utility Bill Integration Tests', () => {
 
   const mockFraudHooksService = {
     onPaymentRecorded: jest.fn().mockResolvedValue(undefined),
+    checkTransactionBeforeRecording: jest.fn().mockResolvedValue(undefined),
   };
 
   beforeAll(async () => {

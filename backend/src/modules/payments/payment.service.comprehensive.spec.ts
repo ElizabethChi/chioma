@@ -73,7 +73,10 @@ describe('PaymentService – edge cases & isolation', () => {
       savePaymentMethod: jest.fn(),
     };
     mockNotifications = { notify: jest.fn() };
-    mockFraud = { onPaymentRecorded: jest.fn().mockResolvedValue(undefined) };
+    mockFraud = {
+      onPaymentRecorded: jest.fn().mockResolvedValue(undefined),
+      checkTransactionBeforeRecording: jest.fn().mockResolvedValue(undefined),
+    } as any;
     mockLock = {
       withLock: jest.fn(
         async (_k: string, _t: number, fn: () => Promise<unknown>) => fn(),

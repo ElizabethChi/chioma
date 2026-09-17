@@ -7,6 +7,7 @@ import {
   Query,
   Request,
   UnauthorizedException,
+  UseInterceptors,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
@@ -24,6 +25,9 @@ import {
 } from './admin-refunds.service';
 import { AdminRefundDecisionDto } from './dto/admin-refund-decision.dto';
 import { PaginationQueryDto } from '../../common/dto/pagination-query.dto';
+import { AuditLog } from '../audit/decorators/audit-log.decorator';
+import { AuditAction, AuditLevel } from '../audit/entities/audit-log.entity';
+import { AuditLogInterceptor } from '../audit/interceptors/audit-log.interceptor';
 
 interface RequestUser {
   id?: string;
@@ -34,6 +38,7 @@ interface RequestUser {
 @ApiBearerAuth('JWT-auth')
 @UseGuards(IpAccessControlGuard, JwtAuthGuard)
 @Controller('admin/refunds')
+@UseInterceptors(AuditLogInterceptor)
 export class AdminRefundsController {
   constructor(private readonly adminRefundsService: AdminRefundsService) {}
 
@@ -63,6 +68,14 @@ export class AdminRefundsController {
   @ApiResponse({ status: 201, description: 'Created' })
   @Post(':id/decision')
   @ApiOperation({ summary: 'Approve or reject a refund request' })
+  @AuditLog({
+    action: AuditAction.PAYMENT_REFUNDED,
+    entityType: 'Refund',
+    level: AuditLevel.SECURITY,
+    includeOldValues: false,
+    includeNewValues: true,
+    sensitive: true,
+  })
   async decideRefundRequest(
     @Param('id') id: string,
     @Body() dto: AdminRefundDecisionDto,

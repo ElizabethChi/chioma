@@ -62,6 +62,10 @@ describe('Batch Processing Integration', () => {
         { provide: getQueueToken('blockchain'), useValue: makeQueueMock() },
         { provide: getQueueToken('data-sync'), useValue: mockDataSyncQueue },
         { provide: getQueueToken('analytics'), useValue: makeQueueMock() },
+        {
+          provide: getQueueToken('video-processing'),
+          useValue: makeQueueMock(),
+        },
       ],
     }).compile();
 

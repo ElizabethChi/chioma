@@ -199,6 +199,11 @@ export const queryKeys = {
       [...queryKeys.search.all, 'suggest', query] as const,
   },
 
+  savedSearches: {
+    all: ['saved-searches'] as const,
+    list: () => [...queryKeys.savedSearches.all, 'list'] as const,
+  },
+
   documents: {
     all: ['documents'] as const,
     lists: () => [...queryKeys.documents.all, 'list'] as const,
@@ -212,5 +217,16 @@ export const queryKeys = {
     all: ['stellar-accounts'] as const,
     network: (publicKey: string) =>
       [...queryKeys.stellarAccounts.all, 'network', publicKey] as const,
+  },
+
+  availability: {
+    all: ['availability'] as const,
+    calendar: (propertyId: string, startDate: string, endDate: string) =>
+      [
+        ...queryKeys.availability.all,
+        propertyId,
+        startDate,
+        endDate,
+      ] as const,
   },
 } as const;

@@ -104,6 +104,9 @@ describe('PaymentService performance benchmarks', () => {
           provide: FraudHooksService,
           useValue: {
             onPaymentRecorded: jest.fn().mockResolvedValue(undefined),
+            checkTransactionBeforeRecording: jest
+              .fn()
+              .mockResolvedValue(undefined),
           },
         },
         LockService,

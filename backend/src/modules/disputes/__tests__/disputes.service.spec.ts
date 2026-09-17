@@ -25,6 +25,7 @@ import {
 import { LockService } from '../../../common/lock';
 import { IdempotencyService } from '../../../common/idempotency';
 import { MalwareScanService } from '../../storage/malware-scan.service';
+import { QueueManagementService } from '../../queues/services/queue-management.service';
 import { Payment as GeneralPayment } from '../../payments/entities/payment.entity';
 import { Payment as RentPayment } from '../../rent/entities/payment.entity';
 
@@ -171,6 +172,10 @@ describe('DisputesService', () => {
         {
           provide: MalwareScanService,
           useValue: { scan: jest.fn().mockResolvedValue({ clean: true }) },
+        },
+        {
+          provide: QueueManagementService,
+          useValue: { addVideoProcessingJob: jest.fn() },
         },
       ],
     }).compile();

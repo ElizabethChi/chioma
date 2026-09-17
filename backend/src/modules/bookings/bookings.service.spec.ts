@@ -6,6 +6,7 @@ import { Payment } from '../payments/entities/payment.entity';
 import { PaymentService } from '../payments/payment.service';
 import { StellarEscrow } from '../stellar/entities/stellar-escrow.entity';
 import { StellarService } from '../stellar/services/stellar.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import {
   Booking,
   BookingStatus,
@@ -24,6 +25,7 @@ describe('BookingsService', () => {
   let service: BookingsService;
   let bookingRepository: jest.Mocked<Repository<Booking>>;
   let propertyRepository: jest.Mocked<Repository<Property>>;
+  let notificationsService: jest.Mocked<NotificationsService>;
   let dataSource: DataSource;
 
   const mockProperty = {
@@ -110,6 +112,12 @@ describe('BookingsService', () => {
           },
         },
         {
+          provide: NotificationsService,
+          useValue: {
+            notify: jest.fn(),
+          },
+        },
+        {
           provide: DataSource,
           useValue: {
             options: { type: 'postgres' },
@@ -122,6 +130,7 @@ describe('BookingsService', () => {
     service = module.get(BookingsService);
     bookingRepository = module.get(getRepositoryToken(Booking));
     propertyRepository = module.get(getRepositoryToken(Property));
+    notificationsService = module.get(NotificationsService);
     dataSource = module.get(DataSource);
     jest.clearAllMocks();
     mockQueryBuilder.leftJoinAndSelect.mockReturnThis();
@@ -129,6 +138,7 @@ describe('BookingsService', () => {
     mockQueryBuilder.where.mockReturnThis();
     mockQueryBuilder.andWhere.mockReturnThis();
     bookingRepository.exists.mockResolvedValue(false);
+    notificationsService.notify.mockResolvedValue({} as never);
     // The service performs booking reads/writes inside a transaction, so route
     // the query runner's manager at the same repository mocks the tests set up.
     mockQueryRunner.manager.create.mockImplementation(
@@ -149,6 +159,10 @@ describe('BookingsService', () => {
     );
     mockQueryRunner.manager.exists.mockImplementation(() =>
       bookingRepository.exists(),
+    );
+    mockQueryRunner.manager.exists.mockImplementation(
+      (_entity: unknown, options: FindOneOptions<Booking>) =>
+        bookingRepository.exists(options),
     );
   });
 
@@ -360,6 +374,100 @@ describe('BookingsService', () => {
       const result = await service.cancel('host-1', 'booking-1');
 
       expect(result.status).toBe(BookingStatus.CANCELLED);
+    });
+  });
+
+  describe('reschedule', () => {
+    const rescheduleBooking = {
+      id: 'booking-1',
+      propertyId: 'property-1',
+      status: BookingStatus.CONFIRMED,
+      checkInDate: '2026-08-01',
+      checkOutDate: '2026-08-05',
+      totalAmount: 400,
+      guestId: 'guest-1',
+      property: { ownerId: 'host-1', price: '100.00' },
+      guest: { id: 'guest-1' },
+    } as unknown as Booking;
+
+    it('throws when the booking does not exist', async () => {
+      bookingRepository.findOne.mockResolvedValue(null);
+
+      await expect(
+        service.reschedule('guest-1', 'missing', {
+          checkIn: '2026-09-01',
+          checkOut: '2026-09-05',
+        }),
+      ).rejects.toThrow(BookingNotFoundError);
+    });
+
+    it('rejects a caller who is not the guest on the booking', async () => {
+      bookingRepository.findOne.mockResolvedValue({ ...rescheduleBooking });
+
+      await expect(
+        service.reschedule('someone-else', 'booking-1', {
+          checkIn: '2026-09-01',
+          checkOut: '2026-09-05',
+        }),
+      ).rejects.toThrow(AuthorizationError);
+    });
+
+    it('rejects rescheduling a cancelled booking', async () => {
+      bookingRepository.findOne.mockResolvedValue({
+        ...rescheduleBooking,
+        status: BookingStatus.CANCELLED,
+      });
+
+      await expect(
+        service.reschedule('guest-1', 'booking-1', {
+          checkIn: '2026-09-01',
+          checkOut: '2026-09-05',
+        }),
+      ).rejects.toThrow(BusinessRuleViolationError);
+    });
+
+    it('rejects a check-out on or before check-in', async () => {
+      bookingRepository.findOne.mockResolvedValue({ ...rescheduleBooking });
+
+      await expect(
+        service.reschedule('guest-1', 'booking-1', {
+          checkIn: '2026-09-05',
+          checkOut: '2026-09-05',
+        }),
+      ).rejects.toThrow(BusinessRuleViolationError);
+    });
+
+    it('rejects new dates that conflict with another booking', async () => {
+      bookingRepository.findOne.mockResolvedValue({ ...rescheduleBooking });
+      bookingRepository.exists.mockResolvedValue(true);
+
+      await expect(
+        service.reschedule('guest-1', 'booking-1', {
+          checkIn: '2026-09-01',
+          checkOut: '2026-09-05',
+        }),
+      ).rejects.toThrow(BusinessRuleViolationError);
+    });
+
+    it('recalculates price and notifies the host on success', async () => {
+      bookingRepository.findOne.mockResolvedValue({ ...rescheduleBooking });
+      bookingRepository.exists.mockResolvedValue(false);
+
+      const result = await service.reschedule('guest-1', 'booking-1', {
+        checkIn: '2026-09-01',
+        checkOut: '2026-09-08',
+      });
+
+      expect(result.checkInDate).toBe('2026-09-01');
+      expect(result.checkOutDate).toBe('2026-09-08');
+      expect(result.totalAmount).toBe(700);
+      expect(bookingRepository.save).toHaveBeenCalled();
+      expect(notificationsService.notify).toHaveBeenCalledWith(
+        'host-1',
+        expect.any(String),
+        expect.any(String),
+        'booking',
+      );
     });
   });
 });

@@ -127,6 +127,10 @@ describe('Scheduled Tasks Integration', () => {
         { provide: getQueueToken('data-sync'), useValue: queueFactory() },
         { provide: getQueueToken('analytics'), useValue: queueFactory() },
         {
+          provide: getQueueToken('video-processing'),
+          useValue: queueFactory(),
+        },
+        {
           provide: getQueueToken(DEAD_LETTER_QUEUE_NAME),
           useValue: deadLetterQueue,
         },

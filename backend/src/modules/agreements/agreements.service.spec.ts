@@ -11,6 +11,7 @@ import { Payment } from '../rent/entities/payment.entity';
 import { AuditService } from '../audit/audit.service';
 import { ReviewPromptService } from '../reviews/review-prompt.service';
 import { ChiomaContractService } from '../stellar/services/chioma-contract.service';
+import { AgreementNftService } from './agreement-nft.service';
 import { BlockchainSyncService } from './blockchain-sync.service';
 import { EscrowIntegrationService } from './escrow-integration.service';
 import { TemplateRenderingService } from './template-rendering.service';
@@ -21,6 +22,11 @@ import { AgreementStateService } from './state-machines/agreement-state-machine.
 
 describe('AgreementsService (lease extensions)', () => {
   let service: AgreementsService;
+  let mockIdempotencyService: {
+    retrieve: jest.Mock;
+    store: jest.Mock;
+    process: jest.Mock;
+  };
 
   const baseAgreement = {
     id: 'agr-1',
@@ -80,8 +86,25 @@ describe('AgreementsService (lease extensions)', () => {
     find: jest.fn(),
   };
 
+  const mockAgreementNftService = {
+    burnNftForAgreement: jest.fn().mockResolvedValue(undefined),
+  };
+
   beforeEach(async () => {
     jest.clearAllMocks();
+    mockIdempotencyService = {
+      retrieve: jest.fn().mockResolvedValue(null),
+      store: jest.fn().mockResolvedValue(undefined),
+      process: jest.fn(
+        async (key: string, ttlMs: number, fn: () => Promise<unknown>) => {
+          const existing = await mockIdempotencyService.retrieve(key);
+          if (existing !== null) return existing;
+          const result = await fn();
+          await mockIdempotencyService.store(key, result, ttlMs);
+          return result;
+        },
+      ),
+    };
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AgreementsService,
@@ -93,6 +116,7 @@ describe('AgreementsService (lease extensions)', () => {
         { provide: AuditService, useValue: {} },
         { provide: ReviewPromptService, useValue: {} },
         { provide: ChiomaContractService, useValue: {} },
+        { provide: AgreementNftService, useValue: mockAgreementNftService },
         { provide: BlockchainSyncService, useValue: {} },
         { provide: EscrowIntegrationService, useValue: {} },
         { provide: TemplateRenderingService, useValue: { render: jest.fn() } },
@@ -114,10 +138,7 @@ describe('AgreementsService (lease extensions)', () => {
         },
         {
           provide: IdempotencyService,
-          useValue: {
-            get: jest.fn().mockResolvedValue(null),
-            set: jest.fn().mockResolvedValue(undefined),
-          },
+          useFactory: () => mockIdempotencyService,
         },
         {
           provide: AgreementStateService,
@@ -127,7 +148,7 @@ describe('AgreementsService (lease extensions)', () => {
             transition: jest.fn(),
           },
         },
-        { provide: EventEmitter2, useValue: {} },
+        { provide: EventEmitter2, useValue: { emit: jest.fn() } },
       ],
     }).compile();
 
@@ -204,6 +225,75 @@ describe('AgreementsService (lease extensions)', () => {
     it('throws when missing', async () => {
       mockAgreementRepo.findOne.mockResolvedValue(null);
       await expect(service.findOne('x')).rejects.toThrow(NotFoundException);
+    });
+  });
+
+  describe('sign', () => {
+    it('transitions the agreement to SIGNED', async () => {
+      mockAgreementRepo.findOne.mockResolvedValue({
+        ...baseAgreement,
+        status: AgreementStatus.PENDING_DEPOSIT,
+      });
+      mockAgreementRepo.save.mockImplementation((a) => Promise.resolve(a));
+
+      const result = await service.sign('agr-1', {});
+
+      expect(result.status).toBe(AgreementStatus.SIGNED);
+    });
+
+    it('returns the original result for a repeated idempotency key without re-signing', async () => {
+      mockAgreementRepo.findOne.mockResolvedValue({
+        ...baseAgreement,
+        status: AgreementStatus.PENDING_DEPOSIT,
+      });
+      mockAgreementRepo.save.mockImplementation((a) => Promise.resolve(a));
+
+      const dto = { idempotencyKey: 'retry-key-1' };
+      const first = await service.sign('agr-1', dto);
+
+      mockIdempotencyService.retrieve.mockResolvedValue(first);
+
+      const second = await service.sign('agr-1', dto);
+
+      expect(second).toEqual(first);
+      expect(mockAgreementRepo.save).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('terminate', () => {
+    it('transitions the agreement to TERMINATED and burns the NFT obligation', async () => {
+      mockAgreementRepo.findOne.mockResolvedValue({
+        ...baseAgreement,
+        status: AgreementStatus.ACTIVE,
+      });
+      mockAgreementRepo.save.mockImplementation((a) => Promise.resolve(a));
+
+      const result = await service.terminate('agr-1', {
+        terminationReason: 'Mutual agreement',
+      });
+
+      expect(result.status).toBe(AgreementStatus.TERMINATED);
+      expect(mockAgreementNftService.burnNftForAgreement).toHaveBeenCalledWith(
+        'agr-1',
+        'AgreementTerminated',
+      );
+    });
+
+    it('still returns the terminated agreement when burning the NFT fails', async () => {
+      mockAgreementRepo.findOne.mockResolvedValue({
+        ...baseAgreement,
+        status: AgreementStatus.ACTIVE,
+      });
+      mockAgreementRepo.save.mockImplementation((a) => Promise.resolve(a));
+      mockAgreementNftService.burnNftForAgreement.mockRejectedValueOnce(
+        new Error('NFT not found for agreement agr-1'),
+      );
+
+      const result = await service.terminate('agr-1', {
+        terminationReason: 'Mutual agreement',
+      });
+
+      expect(result.status).toBe(AgreementStatus.TERMINATED);
     });
   });
 });

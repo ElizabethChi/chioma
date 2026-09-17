@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
@@ -36,6 +36,8 @@ export interface MaintenanceFilter {
 
 @Injectable()
 export class MaintenanceService {
+  private readonly logger = new Logger(MaintenanceService.name);
+
   constructor(
     @InjectRepository(MaintenanceRequest)
     private readonly maintenanceRepo: Repository<MaintenanceRequest>,
@@ -136,7 +138,14 @@ export class MaintenanceService {
 
     // Trigger review prompt if closed
     if (status === MaintenanceStatus.CLOSED) {
-      await this.reviewPromptService.promptForMaintenanceReview(id);
+      try {
+        await this.reviewPromptService.promptForMaintenanceReview(id);
+      } catch (error) {
+        this.logger.error(
+          `Failed to send maintenance review prompt for request ${id}`,
+          error,
+        );
+      }
     }
 
     return saved;

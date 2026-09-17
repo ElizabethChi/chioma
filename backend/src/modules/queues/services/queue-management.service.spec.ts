@@ -121,6 +121,26 @@ describe('QueueManagementService', () => {
             getJob: jest.fn(),
           },
         },
+        {
+          provide: getQueueToken('video-processing'),
+          useValue: {
+            add: jest.fn().mockResolvedValue({ id: '6' }),
+            getJobCounts: jest.fn().mockResolvedValue({
+              active: 0,
+              wait: 0,
+              delayed: 0,
+              failed: 0,
+              completed: 0,
+            }),
+            getFailed: jest.fn().mockResolvedValue([]),
+            getDelayed: jest.fn().mockResolvedValue([]),
+            isPaused: jest.fn().mockReturnValue(false),
+            pause: jest.fn().mockResolvedValue(undefined),
+            resume: jest.fn().mockResolvedValue(undefined),
+            clean: jest.fn().mockResolvedValue(undefined),
+            getJob: jest.fn(),
+          },
+        },
       ],
     }).compile();
 
