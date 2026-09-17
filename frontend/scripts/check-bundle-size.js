@@ -67,68 +67,72 @@ function formatDelta(currentKB, baselineKB) {
 const RESET = '\x1b[0m';
 
 // ─── Build Manifest Parsing ───────────────────────────────────────────────────
+//
+// Next.js 16 (Turbopack, the default `next build` mode) no longer emits
+// `app-build-manifest.json`. Per-route first-load JS is now reported in
+// `.next/diagnostics/route-bundle-stats.json`, as a flat list of
+// `{ route, firstLoadChunkPaths }` entries — but `firstLoadChunkPaths`
+// includes every chunk needed for that route's first load, shared
+// framework/vendor chunks included, so it can't be used as-is for a
+// route-specific budget (it would double-count the shared baseline into
+// every route). A chunk that appears in literally every route's first load
+// is treated as "shared"; everything else is that route's own weight.
 
-function collectRouteChunks() {
-  const chunksDir = path.join(BUILD_DIR, 'static', 'chunks');
-  let allJsChunks = [];
-  try {
-    allJsChunks = fs.readdirSync(chunksDir).filter((f) => f.endsWith('.js'));
-  } catch {
-    allJsChunks = [];
-  }
+function loadRouteBundleStats() {
+  const statsPath = path.join(
+    BUILD_DIR,
+    'diagnostics',
+    'route-bundle-stats.json',
+  );
+  const stats = readJson(statsPath);
+  return Array.isArray(stats) ? stats : null;
+}
 
-  let totalStaticBytes = 0;
-  for (const file of allJsChunks) {
-    try {
-      totalStaticBytes += fs.statSync(path.join(chunksDir, file)).size;
-    } catch {
-      // ignore
+function classifyChunks(routeStats) {
+  const chunkRouteCount = new Map();
+  for (const { firstLoadChunkPaths } of routeStats) {
+    for (const chunk of firstLoadChunkPaths || []) {
+      chunkRouteCount.set(chunk, (chunkRouteCount.get(chunk) || 0) + 1);
     }
   }
 
+  const totalRoutes = routeStats.length;
+  const sharedChunks = new Set(
+    [...chunkRouteCount.entries()]
+      .filter(([, count]) => count === totalRoutes)
+      .map(([chunk]) => chunk),
+  );
+
+  return sharedChunks;
+}
+
+function chunkSizeBytes(chunkPath) {
+  try {
+    return fs.statSync(path.join(ROOT, chunkPath)).size;
+  } catch {
+    return 0;
+  }
+}
+
+function collectRouteChunks(routeStats, sharedChunks) {
+  let totalStaticBytes = 0;
+  for (const chunk of sharedChunks) {
+    totalStaticBytes += chunkSizeBytes(chunk);
+  }
   return { totalStaticBytes };
 }
 
-function getRouteChunks(routeKey, buildManifest, appBuildManifest) {
-  // check app directory
-  if (appBuildManifest && appBuildManifest.pages) {
-    if (appBuildManifest.pages[routeKey])
-      return appBuildManifest.pages[routeKey];
-    const asPage = routeKey === '/' ? '/page' : `${routeKey}/page`;
-    if (appBuildManifest.pages[asPage]) return appBuildManifest.pages[asPage];
-  }
+function getRouteSizeBytes(routeKey, routeStats, sharedChunks) {
+  const entry = routeStats.find((r) => r.route === routeKey);
+  if (!entry) return 0;
 
-  // check pages directory
-  if (buildManifest && buildManifest.pages) {
-    if (buildManifest.pages[routeKey]) return buildManifest.pages[routeKey];
-  }
-
-  return [];
-}
-
-function getRouteSizeBytes(
-  routeKey,
-  buildManifest,
-  appBuildManifest,
-  buildDir,
-) {
-  const chunks = getRouteChunks(routeKey, buildManifest, appBuildManifest);
   let sizeBytes = 0;
   const seen = new Set();
-
-  for (const chunk of chunks) {
-    if (seen.has(chunk)) continue;
+  for (const chunk of entry.firstLoadChunkPaths || []) {
+    if (seen.has(chunk) || sharedChunks.has(chunk)) continue;
     seen.add(chunk);
-
-    if (!chunk.endsWith('.js')) continue;
-
-    try {
-      sizeBytes += fs.statSync(path.join(buildDir, chunk)).size;
-    } catch {
-      // ignore
-    }
+    sizeBytes += chunkSizeBytes(chunk);
   }
-
   return sizeBytes;
 }
 
@@ -157,13 +161,20 @@ function main() {
   const budgets = budgetConfig.routes;
   const baselines = budgetConfig.baseline || {};
 
-  const BUILD_MANIFEST = path.join(BUILD_DIR, 'build-manifest.json');
-  const APP_BUILD_MANIFEST = path.join(BUILD_DIR, 'app-build-manifest.json');
+  const routeStats = loadRouteBundleStats();
+  if (!routeStats) {
+    const message =
+      '⚠ .next/diagnostics/route-bundle-stats.json not found. Run `pnpm run build` (Turbopack) before checking bundle sizes.';
+    if (IS_CI) {
+      console.error(`\x1b[31m✗ ${message}\x1b[0m`);
+      process.exit(1);
+    }
+    console.warn(`\x1b[33m${message}\x1b[0m`);
+    process.exit(0);
+  }
 
-  const buildManifest = readJson(BUILD_MANIFEST) || {};
-  const appBuildManifest = readJson(APP_BUILD_MANIFEST) || {};
-
-  const { totalStaticBytes } = collectRouteChunks();
+  const sharedChunks = classifyChunks(routeStats);
+  const { totalStaticBytes } = collectRouteChunks(routeStats, sharedChunks);
 
   const COL = {
     route: 22,
@@ -197,12 +208,7 @@ function main() {
     if (routeKey === 'shared-chunks') {
       sizeKB = toKB(totalStaticBytes);
     } else {
-      const bytes = getRouteSizeBytes(
-        routeKey,
-        buildManifest,
-        appBuildManifest,
-        BUILD_DIR,
-      );
+      const bytes = getRouteSizeBytes(routeKey, routeStats, sharedChunks);
       if (bytes > 0) {
         sizeKB = toKB(bytes);
       } else {
@@ -291,7 +297,7 @@ if (require.main === module) {
 }
 
 module.exports = {
-  getRouteChunks,
+  classifyChunks,
   getRouteSizeBytes,
   statusLabel,
 };
