@@ -31,7 +31,9 @@ export function usePolling(
   const callbackRef = useRef(callback);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  callbackRef.current = callback;
+  useEffect(() => {
+    callbackRef.current = callback;
+  });
 
   const stableCallback = useCallback(() => {
     callbackRef.current();
