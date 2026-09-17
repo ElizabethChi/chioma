@@ -88,6 +88,10 @@ describe('Queue Processing Integration', () => {
         { provide: getQueueToken('blockchain'), useValue: mockBlockchainQueue },
         { provide: getQueueToken('data-sync'), useValue: makeQueueMock() },
         { provide: getQueueToken('analytics'), useValue: makeQueueMock() },
+        {
+          provide: getQueueToken('video-processing'),
+          useValue: makeQueueMock(),
+        },
       ],
     }).compile();
 

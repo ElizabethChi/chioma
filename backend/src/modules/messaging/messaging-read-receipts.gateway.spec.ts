@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { MessagingGateway } from './messaging.gateway';
 import { MessagingService } from './messaging.service';
 import { WebSocketSessionService } from './websocket-session.service';
+import { RoomAccessGuard } from './room-access.guard';
 import { Socket } from 'socket.io';
 
 describe('MessagingGateway - Read Receipts', () => {
@@ -35,7 +36,10 @@ describe('MessagingGateway - Read Receipts', () => {
           useValue: mockSessionService,
         },
       ],
-    }).compile();
+    })
+      .overrideGuard(RoomAccessGuard)
+      .useValue({ canActivate: () => true })
+      .compile();
 
     gateway = module.get<MessagingGateway>(MessagingGateway);
     messagingService = module.get<MessagingService>(MessagingService);

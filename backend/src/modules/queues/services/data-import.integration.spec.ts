@@ -88,6 +88,19 @@ describe('Data Import Integration', () => {
             clean: jest.fn(),
           },
         },
+        {
+          provide: getQueueToken('video-processing'),
+          useValue: {
+            add: jest.fn(),
+            getJobCounts: jest.fn().mockResolvedValue({}),
+            getFailed: jest.fn().mockResolvedValue([]),
+            getDelayed: jest.fn().mockResolvedValue([]),
+            isPaused: jest.fn().mockResolvedValue(false),
+            pause: jest.fn(),
+            resume: jest.fn(),
+            clean: jest.fn(),
+          },
+        },
       ],
     }).compile();
 

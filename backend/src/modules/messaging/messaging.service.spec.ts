@@ -4,6 +4,7 @@ import { getRepositoryToken } from '@nestjs/typeorm';
 import { Message } from './entities/message.entity';
 import { ChatRoom } from './entities/chat-room.entity';
 import { Participant } from './entities/participant.entity';
+import { MessageRead } from './entities/message-read.entity';
 
 const mockRepo = () => ({
   create: jest.fn(),
@@ -22,6 +23,7 @@ describe('MessagingService', () => {
         { provide: getRepositoryToken(Message), useFactory: mockRepo },
         { provide: getRepositoryToken(ChatRoom), useFactory: mockRepo },
         { provide: getRepositoryToken(Participant), useFactory: mockRepo },
+        { provide: getRepositoryToken(MessageRead), useFactory: mockRepo },
       ],
     }).compile();
 
