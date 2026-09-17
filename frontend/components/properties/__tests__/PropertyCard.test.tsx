@@ -2,6 +2,18 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import React from 'react';
 
+vi.mock('next/image', () => ({
+  default: ({
+    src,
+    alt,
+    ...props
+  }: {
+    src: string;
+    alt: string;
+    [key: string]: unknown;
+  }) => React.createElement('img', { src, alt, ...props }),
+}));
+
 vi.mock('@/contexts/ModalContext', () => ({
   useModal: vi.fn(() => ({
     openModal: vi.fn(),

@@ -125,6 +125,9 @@ describe('WalletConnectButton', () => {
         role: 'user',
         firstName: '',
         lastName: '',
+        emailVerified: false,
+        avatar: undefined,
+        locale: undefined,
       }),
     );
     expect(setWalletAddress).toHaveBeenCalledWith('GABC123');

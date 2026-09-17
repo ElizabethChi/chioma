@@ -63,10 +63,14 @@ describe('RoleSelectionModal', () => {
     expect(userButton).not.toBeNull();
     fireEvent.click(userButton!);
     await vi.waitFor(() => {
+      // The "User" button's role.id is 'tenant' for dashboard routing, but
+      // the account-level auth Role type (store/authStore.ts) only has
+      // 'admin' | 'user' | 'agent' — tenant and landlord both authenticate
+      // as 'user'.
       expect(mockSetTokens).toHaveBeenCalledWith(
         'mock-token',
         'mock-refresh',
-        expect.objectContaining({ role: 'tenant' }),
+        expect.objectContaining({ role: 'user' }),
       );
     });
   });
