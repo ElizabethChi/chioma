@@ -35,6 +35,8 @@ export class DeadLetterQueueService {
     @InjectQueue('blockchain') private readonly blockchainQueue: Queue,
     @InjectQueue('data-sync') private readonly dataSyncQueue: Queue,
     @InjectQueue('analytics') private readonly analyticsQueue: Queue,
+    @InjectQueue('video-processing')
+    private readonly videoProcessingQueue: Queue,
     private readonly configService: ConfigService,
     private readonly errorNotificationService: ErrorNotificationService,
   ) {}
@@ -309,6 +311,8 @@ export class DeadLetterQueueService {
         return this.dataSyncQueue;
       case 'analytics':
         return this.analyticsQueue;
+      case 'video-processing':
+        return this.videoProcessingQueue;
       default: {
         const _exhaustive: never = queueName;
         throw new BadRequestException(`Unknown queue: ${String(_exhaustive)}`);

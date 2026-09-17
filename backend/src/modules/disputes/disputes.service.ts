@@ -68,6 +68,7 @@ export class DisputesService {
     private readonly lockService: LockService,
     private readonly idempotencyService: IdempotencyService,
     private readonly malwareScan: MalwareScanService,
+    private readonly queueManagementService: QueueManagementService,
     @Optional() private readonly configService?: ConfigService,
   ) {}
 
@@ -525,6 +526,7 @@ export class DisputesService {
     // wasn't provided.
     const buffer = file.buffer ?? (await readFile(file.path));
     const scanResult = await this.malwareScan.scan(buffer, file.originalname);
+    const isVideo = detectedType?.startsWith('video/') ?? false;
 
     // Videos are transcoded asynchronously (see VideoQueueProcessor), which
     // needs the original file available on disk by path, not the in-memory

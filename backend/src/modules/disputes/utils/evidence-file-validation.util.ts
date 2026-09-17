@@ -17,6 +17,9 @@ export const ALLOWED_EVIDENCE_MIME_TYPES = [
   'text/plain',
   'application/msword',
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'video/mp4',
+  'video/quicktime',
+  'video/webm',
 ] as const;
 
 type SniffedType = (typeof ALLOWED_EVIDENCE_MIME_TYPES)[number];
@@ -49,7 +52,34 @@ const MAGIC_SIGNATURES: MagicSignature[] = [
     mime: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
     bytes: [0x50, 0x4b, 0x03, 0x04],
   },
+  // WebM/Matroska EBML header
+  { mime: 'video/webm', bytes: [0x1a, 0x45, 0xdf, 0xa3] },
 ];
+
+const FTYP_BOX_OFFSET = 4;
+const FTYP_SIGNATURE = [0x66, 0x74, 0x79, 0x70]; // 'ftyp'
+
+/**
+ * MP4 and QuickTime (.mov) are both ISO-BMFF containers, so they share the
+ * `ftyp` box at byte offset 4 rather than a fixed leading signature; the
+ * major brand that follows it (4 ASCII bytes at offset 8) is what
+ * distinguishes a QuickTime file from the broader MP4 family.
+ */
+function detectIsoBmffVideoType(
+  buffer: Buffer,
+): 'video/mp4' | 'video/quicktime' | null {
+  if (buffer.length < 12) {
+    return null;
+  }
+  const hasFtypBox = FTYP_SIGNATURE.every(
+    (byte, i) => buffer[FTYP_BOX_OFFSET + i] === byte,
+  );
+  if (!hasFtypBox) {
+    return null;
+  }
+  const majorBrand = buffer.subarray(8, 12).toString('ascii');
+  return majorBrand.startsWith('qt') ? 'video/quicktime' : 'video/mp4';
+}
 
 function matchesSignature(buffer: Buffer, signature: MagicSignature): boolean {
   const offset = signature.offset ?? 0;
@@ -86,6 +116,10 @@ function looksLikePlainText(buffer: Buffer): boolean {
  * bytes. Returns `null` when the content matches no allowed evidence type.
  */
 export function sniffEvidenceFileType(buffer: Buffer): SniffedType | null {
+  const isoBmffType = detectIsoBmffVideoType(buffer);
+  if (isoBmffType) {
+    return isoBmffType;
+  }
   for (const signature of MAGIC_SIGNATURES) {
     if (matchesSignature(buffer, signature)) {
       return signature.mime;
@@ -133,7 +167,7 @@ export function validateEvidenceFile(
     return {
       isValid: false,
       error:
-        'Invalid file type. Only images, PDFs, and documents are allowed (content did not match an allowed type)',
+        'Invalid file type. Only images, PDFs, documents, and videos (MP4, QuickTime, WebM) are allowed (content did not match an allowed type)',
     };
   }
 
