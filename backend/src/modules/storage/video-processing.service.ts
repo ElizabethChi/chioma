@@ -42,7 +42,7 @@ export class VideoProcessingService {
     return new Promise((resolve, reject) => {
       ffmpeg.ffprobe(filePath, (err, metadata) => {
         if (err) {
-          reject(err);
+          reject(err instanceof Error ? err : new Error(String(err)));
           return;
         }
         const videoStream = metadata.streams.find(

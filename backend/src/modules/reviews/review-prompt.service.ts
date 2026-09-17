@@ -84,7 +84,9 @@ export class ReviewPromptService {
     message: string,
     type: string,
   ): Promise<void> {
-    const recipients = [...new Set(userIds.filter((id): id is string => Boolean(id)))];
+    const recipients = [
+      ...new Set(userIds.filter((id): id is string => Boolean(id))),
+    ];
 
     const results = await Promise.allSettled(
       recipients.map((userId) =>

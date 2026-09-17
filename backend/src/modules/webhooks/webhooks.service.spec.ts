@@ -588,7 +588,9 @@ describe('WebhooksService', () => {
 
     it('schedule is strictly increasing', () => {
       for (let i = 1; i < BACKOFF_SCHEDULE_MS.length; i++) {
-        expect(BACKOFF_SCHEDULE_MS[i]).toBeGreaterThan(BACKOFF_SCHEDULE_MS[i - 1]);
+        expect(BACKOFF_SCHEDULE_MS[i]).toBeGreaterThan(
+          BACKOFF_SCHEDULE_MS[i - 1],
+        );
       }
     });
 
@@ -678,7 +680,9 @@ describe('WebhooksService', () => {
 
       expect(setTimeoutSpy).not.toHaveBeenCalled();
       // delivery.save should have been called with exhausted=true
-      const lastSave = deliveryRepository.save.mock.calls.at(-1)?.[0] as WebhookDelivery;
+      const lastSave = deliveryRepository.save.mock.calls.at(
+        -1,
+      )?.[0] as WebhookDelivery;
       expect(lastSave.exhausted).toBe(true);
       expect(lastSave.nextRetryAt).toBeNull();
     });
@@ -690,7 +694,9 @@ describe('WebhooksService', () => {
 
       await service.deliverWithBackoff(endpoint, 'payment.received', {}, 1);
 
-      const lastSave = deliveryRepository.save.mock.calls.at(-1)?.[0] as WebhookDelivery;
+      const lastSave = deliveryRepository.save.mock.calls.at(
+        -1,
+      )?.[0] as WebhookDelivery;
       expect(lastSave.nextRetryAt).toBeInstanceOf(Date);
     });
 
@@ -713,7 +719,9 @@ describe('WebhooksService', () => {
 
     it('stamps errorCode NETWORK_ERROR on a non-HTTP failure', async () => {
       const endpoint = mockEndpoint();
-      (mockedAxios.post as jest.Mock).mockRejectedValue(new Error('ECONNREFUSED'));
+      (mockedAxios.post as jest.Mock).mockRejectedValue(
+        new Error('ECONNREFUSED'),
+      );
       mockedAxios.isAxiosError.mockReturnValue(false);
 
       const result = await service.deliverWithBackoff(

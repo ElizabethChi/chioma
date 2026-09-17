@@ -112,11 +112,7 @@ export class WebhooksController {
     @Param('id') id: string,
     @Param('deliveryId') deliveryId: string,
   ) {
-    return this.webhooksService.getDeliveryForUser(
-      req.user.id,
-      id,
-      deliveryId,
-    );
+    return this.webhooksService.getDeliveryForUser(req.user.id, id, deliveryId);
   }
 
   @Put(':id')

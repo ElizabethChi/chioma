@@ -14,10 +14,7 @@ import { WebhookDelivery } from './entities/webhook-delivery.entity';
 import { WebhookEvent } from './webhook-event';
 import { WebhookSignatureService } from './webhook-signature.service';
 import { PaginationUtils } from '../../common/utils';
-import {
-  MAX_DELIVERY_ATTEMPTS,
-  nextRetryAt,
-} from './webhook-backoff';
+import { MAX_DELIVERY_ATTEMPTS, nextRetryAt } from './webhook-backoff';
 
 export interface WebhookEndpointInput {
   url: string;
@@ -82,7 +79,12 @@ export class WebhooksService {
     payload: Record<string, unknown>,
     attemptNumber = 1,
   ): Promise<WebhookDelivery> {
-    const delivery = await this.deliverEvent(endpoint, event, payload, attemptNumber);
+    const delivery = await this.deliverEvent(
+      endpoint,
+      event,
+      payload,
+      attemptNumber,
+    );
 
     if (!delivery.successful) {
       const nextAttempt = attemptNumber + 1;
@@ -175,7 +177,8 @@ export class WebhooksService {
       delivery.lastAttemptAt = new Date();
       delivery.errorCode = response?.status
         ? `HTTP_${response.status}`
-        : error instanceof Error && error.message.toLowerCase().includes('timeout')
+        : error instanceof Error &&
+            error.message.toLowerCase().includes('timeout')
           ? 'TIMEOUT'
           : 'NETWORK_ERROR';
       this.logger.warn(
@@ -321,7 +324,12 @@ export class WebhooksService {
 
       // Manual retry always starts from attempt 1 so the full backoff
       // schedule is available again.
-      return this.deliverWithBackoff(endpoint, delivery.event, delivery.payload, 1);
+      return this.deliverWithBackoff(
+        endpoint,
+        delivery.event,
+        delivery.payload,
+        1,
+      );
     }
 
     if (!options.event) {
@@ -330,6 +338,11 @@ export class WebhooksService {
       );
     }
 
-    return this.deliverWithBackoff(endpoint, options.event, options.payload ?? {}, 1);
+    return this.deliverWithBackoff(
+      endpoint,
+      options.event,
+      options.payload ?? {},
+      1,
+    );
   }
 }

@@ -225,35 +225,59 @@ export class UsersService {
       await manager.softDelete(Review, { reviewerId: userId });
 
       // ── 4. Reviews where this user is the reviewee → anonymize author ─────
-      await manager.update(Review, { revieweeId: userId }, {
-        reviewerId: ANONYMIZED_USER_ID,
-        comment: null as unknown as string,
-      });
+      await manager.update(
+        Review,
+        { revieweeId: userId },
+        {
+          reviewerId: ANONYMIZED_USER_ID,
+          comment: null as unknown as string,
+        },
+      );
 
       // ── 5. GuestReviews authored by user (as guest) → soft-delete ─────────
       await manager.softDelete(GuestReview, { guestId: userId });
 
       // ── 6. GuestReviews received by user (as host) → anonymize guest ──────
-      await manager.update(GuestReview, { hostId: userId }, {
-        guestId: ANONYMIZED_USER_ID,
-        comment: '',
-      });
+      await manager.update(
+        GuestReview,
+        { hostId: userId },
+        {
+          guestId: ANONYMIZED_USER_ID,
+          comment: '',
+        },
+      );
 
       // ── 7. HostReviews authored by user (as host) → soft-delete ──────────
       await manager.softDelete(HostReview, { hostId: userId });
 
       // ── 8. HostReviews received by user (as guest) → anonymize host ───────
-      await manager.update(HostReview, { guestId: userId }, {
-        hostId: ANONYMIZED_USER_ID,
-        comment: '',
-      });
+      await manager.update(
+        HostReview,
+        { guestId: userId },
+        {
+          hostId: ANONYMIZED_USER_ID,
+          comment: '',
+        },
+      );
 
       // ── 9. Messages: anonymize senderId / receiverId ──────────────────────
-      await manager.update(Message, { senderId: Number(userId) }, { senderId: 0 });
-      await manager.update(Message, { receiverId: Number(userId) }, { receiverId: 0 });
+      await manager.update(
+        Message,
+        { senderId: Number(userId) },
+        { senderId: 0 },
+      );
+      await manager.update(
+        Message,
+        { receiverId: Number(userId) },
+        { receiverId: 0 },
+      );
 
       // ── 10. Participants: anonymize userId ────────────────────────────────
-      await manager.update(Participant, { userId: Number(userId) }, { userId: 0 });
+      await manager.update(
+        Participant,
+        { userId: Number(userId) },
+        { userId: 0 },
+      );
 
       // ── 11. PropertyInquiries: anonymize PII + user references ────────────
       await manager.update(

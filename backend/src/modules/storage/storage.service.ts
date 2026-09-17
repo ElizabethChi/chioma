@@ -272,7 +272,10 @@ export class StorageService {
   async purgeQuarantinedFiles(retentionDays: number): Promise<number> {
     const cutoff = new Date(Date.now() - retentionDays * 24 * 60 * 60 * 1000);
     const candidates = await this.fileMetadataRepo.find({
-      where: { scanStatus: ScanStatus.QUARANTINED, createdAt: LessThan(cutoff) },
+      where: {
+        scanStatus: ScanStatus.QUARANTINED,
+        createdAt: LessThan(cutoff),
+      },
     });
 
     let purged = 0;

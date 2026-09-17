@@ -35,11 +35,11 @@
 
 /** Base delays in milliseconds for each retry attempt (1-indexed). */
 export const BACKOFF_SCHEDULE_MS: readonly number[] = [
-  30_000,        // attempt 1 →  30 s
-  300_000,       // attempt 2 →   5 min
-  1_800_000,     // attempt 3 →  30 min
-  7_200_000,     // attempt 4 →   2 h
-  28_800_000,    // attempt 5 →   8 h
+  30_000, // attempt 1 →  30 s
+  300_000, // attempt 2 →   5 min
+  1_800_000, // attempt 3 →  30 min
+  7_200_000, // attempt 4 →   2 h
+  28_800_000, // attempt 5 →   8 h
 ] as const;
 
 /** Maximum number of automatic retry attempts. */

@@ -243,16 +243,12 @@ export class InquiriesService {
       throw new NotFoundException('Inquiry not found');
     }
 
-    const alreadyResponded =
-      inquiry.status === PropertyInquiryStatus.RESPONDED;
+    const alreadyResponded = inquiry.status === PropertyInquiryStatus.RESPONDED;
 
     // Validate the lifecycle move up front so an illegal state (e.g. CLOSED)
     // is rejected before we post anything into the messaging room.
     if (!alreadyResponded) {
-      assertInquiryTransition(
-        inquiry.status,
-        PropertyInquiryStatus.RESPONDED,
-      );
+      assertInquiryTransition(inquiry.status, PropertyInquiryStatus.RESPONDED);
     }
 
     await this.messagingService.sendDirectMessage(
