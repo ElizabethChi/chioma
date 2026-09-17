@@ -47,9 +47,9 @@ export function useMarkInquiryViewed() {
         queryKey: INCOMING_INQUIRIES_QUERY_KEY,
       });
       const snapshots = queryClient
-        .getQueriesData<
-          InquiryRecord[]
-        >({ queryKey: INCOMING_INQUIRIES_QUERY_KEY })
+        .getQueriesData<InquiryRecord[]>({
+          queryKey: INCOMING_INQUIRIES_QUERY_KEY,
+        })
         .map(([key, data]) => [key, data] as const);
 
       queryClient.setQueriesData<InquiryRecord[]>(

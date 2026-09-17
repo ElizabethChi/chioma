@@ -27,9 +27,7 @@ export function useMessagingUnreadCount() {
       return 0;
     }
     const rawData = data as unknown as
-      | { data?: ChatRoom[] }
-      | ChatRoom[]
-      | undefined;
+      { data?: ChatRoom[] } | ChatRoom[] | undefined;
     const rooms: ChatRoom[] = Array.isArray(rawData)
       ? rawData
       : rawData && typeof rawData === 'object' && Array.isArray(rawData.data)

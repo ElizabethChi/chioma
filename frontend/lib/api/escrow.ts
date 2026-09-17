@@ -27,12 +27,7 @@ import { apiClient } from '../api-client';
 export type AssetType = 'native' | 'credit_alphanum4' | 'credit_alphanum12';
 
 export type EscrowStatus =
-  | 'created'
-  | 'funded'
-  | 'released'
-  | 'refunded'
-  | 'expired'
-  | 'disputed';
+  'created' | 'funded' | 'released' | 'refunded' | 'expired' | 'disputed';
 
 // ---------------------------------------------------------------------------
 // Shared condition shapes

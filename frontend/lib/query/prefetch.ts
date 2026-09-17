@@ -111,11 +111,7 @@ export function prefetchMaintenanceDetail(
 }
 
 export type PrefetchKind =
-  | 'property'
-  | 'payment'
-  | 'agreement'
-  | 'maintenance'
-  | 'none';
+  'property' | 'payment' | 'agreement' | 'maintenance' | 'none';
 
 /**
  * Dispatch detail prefetch by kind. Used by PrefetchLink on hover/focus.

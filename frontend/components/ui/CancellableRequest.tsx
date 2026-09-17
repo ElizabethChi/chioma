@@ -5,9 +5,7 @@ import { CancelButton } from './CancelButton';
 import { Badge } from './badge';
 
 type CancellationState =
-  | { status: 'idle' }
-  | { status: 'in-flight' }
-  | { status: 'cancelled' };
+  { status: 'idle' } | { status: 'in-flight' } | { status: 'cancelled' };
 
 export interface CancellableRequestProps {
   label: string;

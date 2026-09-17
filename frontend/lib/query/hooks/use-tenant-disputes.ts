@@ -59,9 +59,9 @@ export function useUpdateTenantDisputeStatus() {
     onMutate: async ({ disputeId, status }) => {
       await queryClient.cancelQueries({ queryKey: TENANT_DISPUTES_QUERY_KEY });
       const snapshots = queryClient
-        .getQueriesData<
-          DisputeListItem[]
-        >({ queryKey: TENANT_DISPUTES_QUERY_KEY })
+        .getQueriesData<DisputeListItem[]>({
+          queryKey: TENANT_DISPUTES_QUERY_KEY,
+        })
         .map(([key, data]) => [key, data] as const);
 
       queryClient.setQueriesData<DisputeListItem[]>(
