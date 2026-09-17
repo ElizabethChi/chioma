@@ -41,11 +41,7 @@ export interface Notification {
 
   // References
   relatedEntityType?:
-    | 'property'
-    | 'agreement'
-    | 'payment'
-    | 'dispute'
-    | 'transaction';
+    'property' | 'agreement' | 'payment' | 'dispute' | 'transaction';
   relatedEntityId?: UUID;
 
   // Actions
