@@ -29,6 +29,14 @@ export default defineConfig({
     baseURL: BASE_URL,
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
+    // The gallery's transactions table formats its mock timestamps in the
+    // browser's local timezone (correct, real product behavior — users see
+    // their own local time). Without pinning it here, the screenshot's
+    // displayed times — and therefore the baseline PNG — depend on whatever
+    // timezone the machine running the test happens to be in, which is
+    // exactly what made this suite non-deterministic between local runs and
+    // GitHub Actions (UTC).
+    timezoneId: 'UTC',
   },
   webServer: {
     // Matches the project's `dev` script: Turbopack has known issues with
@@ -37,6 +45,14 @@ export default defineConfig({
     url: BASE_URL,
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
+    // TZ here must match `use.timezoneId` above. The server process's own
+    // timezone isn't affected by Playwright's browser-context timezoneId —
+    // only the client is — so without this, SSR renders local-timezone
+    // timestamps while the browser hydrates with UTC ones, producing a
+    // genuine React hydration mismatch (visible as an error toast) on any
+    // page that formats a date/time server-side, like the gallery's
+    // transactions table.
+    env: { TZ: 'UTC' },
   },
   projects: [
     {
