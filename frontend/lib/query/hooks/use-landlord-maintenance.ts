@@ -5,10 +5,7 @@ import { apiClient } from '@/lib/api-client';
 import toast from 'react-hot-toast';
 
 export type MaintenanceStatus =
-  | 'OPEN'
-  | 'IN_PROGRESS'
-  | 'COMPLETED'
-  | 'CANCELLED';
+  'OPEN' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
 export type MaintenancePriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
 
 export interface MaintenanceFilters {
@@ -264,9 +261,9 @@ export function useUpdateMaintenanceStatus() {
         queryKey: LANDLORD_MAINTENANCE_QUERY_KEY,
       });
       const snapshots = queryClient
-        .getQueriesData<
-          MaintenanceRecord[]
-        >({ queryKey: LANDLORD_MAINTENANCE_QUERY_KEY })
+        .getQueriesData<MaintenanceRecord[]>({
+          queryKey: LANDLORD_MAINTENANCE_QUERY_KEY,
+        })
         .map(([key, data]) => [key, data] as const);
 
       queryClient.setQueriesData<MaintenanceRecord[]>(

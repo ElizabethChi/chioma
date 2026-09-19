@@ -199,9 +199,12 @@ describe('[E2E] Messaging / chat flow', () => {
     });
     fireEvent.click(screen.getByRole('button', { name: /send/i }));
 
+    // The emit carries a client-generated clientId (for optimistic-send
+    // reconciliation) plus an ack callback as the third argument.
     expect(mockSocket.emit).toHaveBeenCalledWith(
       'sendMessage',
       expect.objectContaining({ roomId: 'room-1', content: 'Hello Bob' }),
+      expect.any(Function),
     );
   });
 

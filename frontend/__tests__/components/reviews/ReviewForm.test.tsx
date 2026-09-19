@@ -70,7 +70,11 @@ describe('ReviewForm', () => {
     // Manually fire submit even though button is disabled
     fireEvent.submit(form);
     await waitFor(() => {
-      expect(screen.getByText('Please select a rating')).toBeDefined();
+      // Surfaced both in the inline field error and the form-level error
+      // summary (FormErrorSummary), so at least one match is expected.
+      expect(
+        screen.getAllByText('Please select a rating').length,
+      ).toBeGreaterThan(0);
     });
   });
 
@@ -82,9 +86,11 @@ describe('ReviewForm', () => {
       screen.getByRole('button', { name: /mint nft rating/i }).closest('form')!,
     );
     await waitFor(() => {
+      // Surfaced both in the inline field error and the form-level error
+      // summary (FormErrorSummary), so at least one match is expected.
       expect(
-        screen.getByText('Review must be at least 10 characters'),
-      ).toBeDefined();
+        screen.getAllByText('Review must be at least 10 characters').length,
+      ).toBeGreaterThan(0);
     });
   });
 
@@ -96,9 +102,11 @@ describe('ReviewForm', () => {
     });
     fireEvent.submit(getSubmitButton().closest('form')!);
     await waitFor(() => {
+      // Surfaced both in the inline field error and the form-level error
+      // summary (FormErrorSummary), so at least one match is expected.
       expect(
-        screen.getByText('Review cannot exceed 500 characters'),
-      ).toBeDefined();
+        screen.getAllByText('Review cannot exceed 500 characters').length,
+      ).toBeGreaterThan(0);
     });
   });
 

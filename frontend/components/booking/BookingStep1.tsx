@@ -178,8 +178,8 @@ export function BookingStep1({
 
       {overlapsBlocked && (
         <p role="alert" className="text-sm text-red-300">
-          Your selected dates include one or more unavailable nights. Please pick
-          a different range.
+          Your selected dates include one or more unavailable nights. Please
+          pick a different range.
         </p>
       )}
 

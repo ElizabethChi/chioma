@@ -32,7 +32,12 @@ export function createVersionedPersistConfig<T, Persisted = T>(
   options: VersionedPersistOptions<T, Persisted>,
 ): Pick<
   PersistOptions<T, Persisted>,
-  'name' | 'version' | 'migrate' | 'partialize' | 'storage' | 'onRehydrateStorage'
+  | 'name'
+  | 'version'
+  | 'migrate'
+  | 'partialize'
+  | 'storage'
+  | 'onRehydrateStorage'
 > {
   const {
     name,

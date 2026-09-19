@@ -200,14 +200,14 @@ jobs:
             const status = exitCode === '0' ? '✅ Budgets OK' : '❌ Budget Exceeded';
             const body = `## 📦 Bundle Size Report — ${status}
 
-\`\`\`
-${report}
-\`\`\`
+            \`\`\`
+            ${report}
+            \`\`\`
 
-### Size delta
-The \`Δ (KB)\` column and delta summary compare current sizes against \`bundle-budgets.json#baseline\`. Positive values indicate bundle growth.
+            ### Size delta
+            The \`Δ (KB)\` column and delta summary compare current sizes against \`bundle-budgets.json#baseline\`. Positive values indicate bundle growth.
 
-> Update \`bundle-budgets.json\` to adjust thresholds. See [BUNDLE_ANALYZER.md](./docs/BUNDLE_ANALYZER.md) for guidance.`;
+            > Update \`bundle-budgets.json\` to adjust thresholds. See [BUNDLE_ANALYZER.md](./docs/BUNDLE_ANALYZER.md) for guidance.`;
 
             try {
               const { data: comments } = await github.rest.issues.listComments({

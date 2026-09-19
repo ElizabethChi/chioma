@@ -27,7 +27,9 @@ export function useOutsideClick(
   const callbackRef = useRef(callback);
   const elementRef = useRef<HTMLElement | null>(null);
 
-  callbackRef.current = callback;
+  useEffect(() => {
+    callbackRef.current = callback;
+  });
 
   const setRef = useCallback((node: HTMLElement | null) => {
     elementRef.current = node;

@@ -40,7 +40,9 @@ export function useFetchOnMount<T>({
   const fetcherRef = useRef(fetcher);
   const mountedRef = useRef(true);
 
-  fetcherRef.current = fetcher;
+  useEffect(() => {
+    fetcherRef.current = fetcher;
+  });
 
   const executeFetch = useCallback(async () => {
     setIsLoading(true);

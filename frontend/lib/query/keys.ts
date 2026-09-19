@@ -222,11 +222,6 @@ export const queryKeys = {
   availability: {
     all: ['availability'] as const,
     calendar: (propertyId: string, startDate: string, endDate: string) =>
-      [
-        ...queryKeys.availability.all,
-        propertyId,
-        startDate,
-        endDate,
-      ] as const,
+      [...queryKeys.availability.all, propertyId, startDate, endDate] as const,
   },
 } as const;

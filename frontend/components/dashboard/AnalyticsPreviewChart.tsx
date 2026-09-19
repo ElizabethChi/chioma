@@ -1,13 +1,7 @@
 'use client';
 
 import React from 'react';
-import {
-  Area,
-  AreaChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-} from 'recharts';
+import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis } from 'recharts';
 
 const analyticsPreviewData = [
   { month: 'Jan', views: 120 },
