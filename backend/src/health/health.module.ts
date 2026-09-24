@@ -10,10 +10,14 @@ import { StellarHealthIndicator } from './indicators/stellar.indicator';
 import { MemoryHealthIndicator } from './indicators/memory.indicator';
 import { RedisHealthIndicator } from './indicators/redis.indicator';
 import { ElasticsearchHealthIndicator } from './indicators/elasticsearch.indicator';
+import { EncryptionHealthIndicator } from './indicators/encryption.indicator';
+import { SorobanHealthIndicator } from './indicators/soroban.indicator';
 import { HealthAutomationService } from './health-automation.service';
 import { MonitoringModule } from '../modules/monitoring/monitoring.module';
 import { LockModule } from '../common/lock/lock.module';
 import { CertificatePinningService } from '../common/security/certificate-pinning.service';
+import { StellarAccountsModule } from '../modules/stellar/sub-modules/stellar-accounts.module';
+import { SorobanClientService } from '../common/services/soroban-client.service';
 
 @Module({
   imports: [
@@ -36,6 +40,7 @@ import { CertificatePinningService } from '../common/security/certificate-pinnin
     TypeOrmModule.forFeature([]),
     MonitoringModule,
     LockModule,
+    StellarAccountsModule,
   ],
   controllers: [HealthController],
   providers: [
@@ -45,6 +50,9 @@ import { CertificatePinningService } from '../common/security/certificate-pinnin
     MemoryHealthIndicator,
     RedisHealthIndicator,
     ElasticsearchHealthIndicator,
+    EncryptionHealthIndicator,
+    SorobanClientService,
+    SorobanHealthIndicator,
     HealthAutomationService,
   ],
   exports: [HealthService, DatabaseHealthIndicator],
