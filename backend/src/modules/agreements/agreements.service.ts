@@ -402,10 +402,18 @@ export class AgreementsService {
     id: string,
     newStatus: AgreementStatus,
     reason?: string,
+    userId?: string,
   ): Promise<RentAgreement> {
     const agreement = await this.findOne(id);
     const oldStatus = agreement.status;
-    this.stateService.validateTransition(oldStatus, newStatus);
+
+    // Validate and transition with logging context
+    this.stateService.validateTransition(oldStatus, newStatus, {
+      agreementId: id,
+      userId: userId || agreement.userId,
+      reason: reason || 'No reason provided',
+    });
+
     agreement.status = newStatus;
     const saved = await this.agreementRepository.save(agreement);
     this.eventEmitter.emit(

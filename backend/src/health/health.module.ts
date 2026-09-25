@@ -6,6 +6,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { HealthController } from './health.controller';
 import { HealthService } from './health.service';
 import { DatabaseHealthIndicator } from './indicators/database.indicator';
+import { DatabasePoolHealthIndicator } from './indicators/database-pool.health';
 import { StellarHealthIndicator } from './indicators/stellar.indicator';
 import { MemoryHealthIndicator } from './indicators/memory.indicator';
 import { RedisHealthIndicator } from './indicators/redis.indicator';
@@ -46,6 +47,7 @@ import { SorobanClientService } from '../common/services/soroban-client.service'
   providers: [
     HealthService,
     DatabaseHealthIndicator,
+    DatabasePoolHealthIndicator,
     StellarHealthIndicator,
     MemoryHealthIndicator,
     RedisHealthIndicator,
@@ -55,6 +57,10 @@ import { SorobanClientService } from '../common/services/soroban-client.service'
     SorobanHealthIndicator,
     HealthAutomationService,
   ],
-  exports: [HealthService, DatabaseHealthIndicator],
+  exports: [
+    HealthService,
+    DatabaseHealthIndicator,
+    DatabasePoolHealthIndicator,
+  ],
 })
 export class HealthModule {}
