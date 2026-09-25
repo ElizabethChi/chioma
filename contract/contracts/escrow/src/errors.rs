@@ -50,6 +50,10 @@ pub enum EscrowError {
     EmptyFreezeReason = 21,
     /// System admin not set
     AdminNotSet = 22,
+    /// Contract is globally paused; state-changing operations are blocked
+    ContractPaused = 23,
+    /// Contract is not currently paused
+    NotPaused = 24,
 }
 
 /// Pins every `EscrowError` discriminant so off-chain code that maps error
@@ -84,5 +88,7 @@ mod pin_tests {
         assert_eq!(EscrowError::NotFrozen as u32, 20);
         assert_eq!(EscrowError::EmptyFreezeReason as u32, 21);
         assert_eq!(EscrowError::AdminNotSet as u32, 22);
+        assert_eq!(EscrowError::ContractPaused as u32, 23);
+        assert_eq!(EscrowError::NotPaused as u32, 24);
     }
 }
