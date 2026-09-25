@@ -8,6 +8,7 @@
 
 use soroban_sdk::{contract, contractimpl, Address, Env, String, Vec};
 
+pub mod admin;
 pub mod errors;
 pub mod events;
 pub mod late_fee;
@@ -28,6 +29,9 @@ mod tests_rate_limit;
 
 #[cfg(test)]
 mod tests_property;
+
+#[cfg(test)]
+mod tests_pause;
 
 // Re-export public APIs
 pub use errors::PaymentError;
@@ -103,6 +107,8 @@ impl PaymentContract {
         recurring_id: &String,
         require_auth: bool,
     ) -> Result<(), Error> {
+        admin::require_not_paused(env)?;
+
         let mut recurring: RecurringPayment = env
             .storage()
             .persistent()
@@ -191,6 +197,33 @@ impl PaymentContract {
         events::platform_fee_collector_updated(&env, collector);
     }
 
+    /// Initialize the contract admin (#1689). Callable once.
+    pub fn initialize_admin(env: Env, admin: Address) -> Result<(), Error> {
+        admin::initialize_admin(env, admin)
+    }
+
+    /// Get the current contract admin, if configured.
+    pub fn get_admin(env: Env) -> Option<Address> {
+        admin::get_admin(&env)
+    }
+
+    /// Pause the contract, blocking all state-changing entry points (#1689).
+    /// Reads remain available. Admin only.
+    pub fn pause(env: Env, caller: Address) -> Result<(), Error> {
+        admin::pause(env, caller)
+    }
+
+    /// Unpause the contract, restoring state-changing entry points (#1689).
+    /// Admin only.
+    pub fn unpause(env: Env, caller: Address) -> Result<(), Error> {
+        admin::unpause(env, caller)
+    }
+
+    /// Whether the contract is currently globally paused.
+    pub fn is_paused(env: Env) -> bool {
+        admin::is_paused(&env)
+    }
+
     /// Get a payment record by ID
     pub fn get_payment(env: Env, payment_id: String) -> Result<PaymentRecord, Error> {
         env.storage()
@@ -259,6 +292,9 @@ impl PaymentContract {
         payment_amount: i128,
     ) -> Result<(), Error> {
         use soroban_sdk::token;
+
+        // Contract must not be paused (#1689)
+        admin::require_not_paused(&env)?;
 
         // Authorization
         from.require_auth();
@@ -380,6 +416,8 @@ impl PaymentContract {
         end_date: u64,
         auto_renew: bool,
     ) -> Result<String, Error> {
+        admin::require_not_paused(&env)?;
+
         let agreement: RentAgreement = env
             .storage()
             .persistent()
@@ -441,6 +479,8 @@ impl PaymentContract {
     }
 
     pub fn pause_recurring_payment(env: Env, recurring_id: String) -> Result<(), Error> {
+        admin::require_not_paused(&env)?;
+
         let mut recurring: RecurringPayment = env
             .storage()
             .persistent()
@@ -476,6 +516,8 @@ impl PaymentContract {
     }
 
     pub fn resume_recurring_payment(env: Env, recurring_id: String) -> Result<(), Error> {
+        admin::require_not_paused(&env)?;
+
         let mut recurring: RecurringPayment = env
             .storage()
             .persistent()
@@ -503,6 +545,8 @@ impl PaymentContract {
     }
 
     pub fn cancel_recurring_payment(env: Env, recurring_id: String) -> Result<(), Error> {
+        admin::require_not_paused(&env)?;
+
         let mut recurring: RecurringPayment = env
             .storage()
             .persistent()
@@ -557,6 +601,12 @@ impl PaymentContract {
     }
 
     pub fn process_due_payments(env: Env) -> Result<Vec<String>, Error> {
+        // Checked up front (in addition to execute_recurring_payment_internal's
+        // own check) so a paused contract rejects the whole batch cleanly
+        // rather than marking every due payment Failed, which the per-item
+        // Err(_) branch below would otherwise do (#1689).
+        admin::require_not_paused(&env)?;
+
         let due = Self::get_due_payments(env.clone())?;
         let mut processed = Vec::new(&env);
 
@@ -625,6 +675,10 @@ impl PaymentContract {
     }
 
     pub fn retry_failed_payment(env: Env, recurring_id: String) -> Result<(), Error> {
+        // Checked up front so a paused contract rejects cleanly rather than
+        // flipping status to Active and then failing the execute step (#1689).
+        admin::require_not_paused(&env)?;
+
         let mut recurring: RecurringPayment = env
             .storage()
             .persistent()
@@ -668,6 +722,8 @@ impl PaymentContract {
         compounding: bool,
     ) -> Result<(), Error> {
         use crate::types::LateFeeConfig;
+
+        admin::require_not_paused(&env)?;
 
         if late_fee_percentage == 0 || late_fee_percentage > 100 {
             return Err(Error::InvalidLateFeePercentage);
@@ -734,6 +790,8 @@ impl PaymentContract {
         payment_id: String,
     ) -> Result<crate::types::LateFeeRecord, Error> {
         use crate::types::LateFeeRecord;
+
+        admin::require_not_paused(&env)?;
 
         // Ensure not already applied
         if env
@@ -819,6 +877,8 @@ impl PaymentContract {
     ) -> Result<(), Error> {
         use crate::types::LateFeeRecord;
 
+        admin::require_not_paused(&env)?;
+
         let agreement: crate::types::RentAgreement = env
             .storage()
             .persistent()
@@ -858,6 +918,8 @@ impl PaymentContract {
         payments_per_year: u32,
         escalation_type: EscalationType,
     ) -> Result<(), Error> {
+        admin::require_not_paused(&env)?;
+
         let agreement: RentAgreement = env
             .storage()
             .persistent()

@@ -37,4 +37,8 @@ pub enum DataKey {
     RentEscalationConfig(String),
     /// Upgrade proposal
     UpgradeProposal(String),
+    /// Contract admin address, for pause/unpause (#1689)
+    Admin,
+    /// Whether the contract is globally paused (#1689)
+    Paused,
 }
