@@ -1,6 +1,6 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class MigrateUserRoleTerminology1783000000000 implements MigrationInterface {
+export class MigrateUserRoleTerminology1783000000001 implements MigrationInterface {
   public async up(queryRunner: QueryRunner): Promise<void> {
     // 1. Migrate legacy 'landlord' and 'tenant' role values in the users table
     await queryRunner.query(`

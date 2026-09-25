@@ -1,6 +1,6 @@
 import { MigrationInterface, QueryRunner, TableColumn } from 'typeorm';
 
-export class AddApiKeyPermissionsAndDescription1900100000000 implements MigrationInterface {
+export class AddApiKeyPermissionsAndDescription1900100000001 implements MigrationInterface {
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.addColumn(
       'api_keys',

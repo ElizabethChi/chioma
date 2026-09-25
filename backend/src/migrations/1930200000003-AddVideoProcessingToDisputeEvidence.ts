@@ -1,7 +1,7 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class AddVideoProcessingToDisputeEvidence1930200000000 implements MigrationInterface {
-  name = 'AddVideoProcessingToDisputeEvidence1930200000000';
+export class AddVideoProcessingToDisputeEvidence1930200000003 implements MigrationInterface {
+  name = 'AddVideoProcessingToDisputeEvidence1930200000003';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`

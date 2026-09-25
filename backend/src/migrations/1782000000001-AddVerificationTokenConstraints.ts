@@ -1,7 +1,7 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class AddVerificationTokenConstraints1782000000000 implements MigrationInterface {
-  name = 'AddVerificationTokenConstraints1782000000000';
+export class AddVerificationTokenConstraints1782000000001 implements MigrationInterface {
+  name = 'AddVerificationTokenConstraints1782000000001';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     // Track token expiry so re-sent tokens can be reused while valid and

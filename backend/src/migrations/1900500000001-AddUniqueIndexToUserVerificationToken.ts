@@ -7,8 +7,8 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  * NULLs as distinct from one another, so verified users (whose token is
  * cleared to NULL) are unaffected.
  */
-export class AddUniqueIndexToUserVerificationToken1900500000000 implements MigrationInterface {
-  name = 'AddUniqueIndexToUserVerificationToken1900500000000';
+export class AddUniqueIndexToUserVerificationToken1900500000001 implements MigrationInterface {
+  name = 'AddUniqueIndexToUserVerificationToken1900500000001';
 
   private readonly indexName = 'idx_users_verification_token';
 
