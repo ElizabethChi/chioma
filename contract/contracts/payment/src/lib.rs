@@ -44,6 +44,7 @@ pub use types::{
 };
 
 use crate::errors::PaymentError as Error;
+use crate::storage::extend_persistent_ttl;
 use crate::storage::DataKey as StorageKey;
 use crate::types::{AgreementStatus, RentAgreement};
 
@@ -80,6 +81,7 @@ impl PaymentContract {
         env.storage()
             .persistent()
             .set(&StorageKey::FailedRecurringPayments, &failed);
+        extend_persistent_ttl(&env, &StorageKey::FailedRecurringPayments);
     }
 
     fn remove_failed_payment(env: &Env, recurring_id: &String) {
@@ -100,6 +102,7 @@ impl PaymentContract {
         env.storage()
             .persistent()
             .set(&StorageKey::FailedRecurringPayments, &updated);
+        extend_persistent_ttl(&env, &StorageKey::FailedRecurringPayments);
     }
 
     fn execute_recurring_payment_internal(
@@ -134,10 +137,9 @@ impl PaymentContract {
 
         if now > recurring.end_date && !recurring.auto_renew {
             recurring.status = RecurringStatus::Completed;
-            env.storage().persistent().set(
-                &StorageKey::RecurringPayment(recurring_id.clone()),
-                &recurring,
-            );
+            let recurring_key = StorageKey::RecurringPayment(recurring_id.clone());
+            env.storage().persistent().set(&recurring_key, &recurring);
+            extend_persistent_ttl(&env, &recurring_key);
             return Err(Error::RecurringPaymentAlreadyCompleted);
         }
 
@@ -149,16 +151,21 @@ impl PaymentContract {
             transaction_hash: None,
         };
 
+        let executions_key = StorageKey::PaymentExecutions(recurring_id.clone());
         let mut executions: Vec<PaymentExecution> = env
             .storage()
             .persistent()
-            .get(&StorageKey::PaymentExecutions(recurring_id.clone()))
+            .get(&executions_key)
             .unwrap_or_else(|| Vec::new(env));
         executions.push_back(execution);
-        env.storage().persistent().set(
-            &StorageKey::PaymentExecutions(recurring_id.clone()),
-            &executions,
-        );
+        // Bounded to MAX_PAYMENT_EXECUTIONS so a long-lived recurring
+        // payment (e.g. monthly rent over many years) can't grow this key
+        // unbounded; the oldest execution records are dropped first (#1683).
+        while executions.len() > crate::storage::MAX_PAYMENT_EXECUTIONS {
+            executions.remove(0);
+        }
+        env.storage().persistent().set(&executions_key, &executions);
+        extend_persistent_ttl(&env, &executions_key);
 
         let interval = Self::frequency_to_seconds(&recurring.frequency);
         recurring.next_payment_date = recurring.next_payment_date.saturating_add(interval);
@@ -171,10 +178,9 @@ impl PaymentContract {
             }
         }
 
-        env.storage().persistent().set(
-            &StorageKey::RecurringPayment(recurring_id.clone()),
-            &recurring,
-        );
+        let recurring_key = StorageKey::RecurringPayment(recurring_id.clone());
+        env.storage().persistent().set(&recurring_key, &recurring);
+        extend_persistent_ttl(&env, &recurring_key);
 
         Self::remove_failed_payment(env, recurring_id);
 
@@ -193,6 +199,9 @@ impl PaymentContract {
         env.storage()
             .instance()
             .set(&StorageKey::PlatformFeeCollector, &collector);
+        env.storage()
+            .instance()
+            .extend_ttl(crate::storage::TTL_THRESHOLD, crate::storage::TTL_BUMP);
 
         events::platform_fee_collector_updated(&env, collector);
     }
@@ -456,13 +465,15 @@ impl PaymentContract {
             auto_renew,
         };
 
-        env.storage().persistent().set(
-            &StorageKey::RecurringPayment(recurring_id.clone()),
-            &recurring,
-        );
+        let recurring_key = StorageKey::RecurringPayment(recurring_id.clone());
+        env.storage().persistent().set(&recurring_key, &recurring);
+        extend_persistent_ttl(&env, &recurring_key);
         env.storage()
             .instance()
             .set(&StorageKey::RecurringPaymentCount, &count);
+        env.storage()
+            .instance()
+            .extend_ttl(crate::storage::TTL_THRESHOLD, crate::storage::TTL_BUMP);
 
         let _event = RecurringPaymentEvent::RecurringPaymentCreated {
             recurring_id: recurring_id.clone(),
@@ -502,10 +513,9 @@ impl PaymentContract {
         }
 
         recurring.status = RecurringStatus::Paused;
-        env.storage().persistent().set(
-            &StorageKey::RecurringPayment(recurring_id.clone()),
-            &recurring,
-        );
+        let recurring_key = StorageKey::RecurringPayment(recurring_id.clone());
+        env.storage().persistent().set(&recurring_key, &recurring);
+        extend_persistent_ttl(&env, &recurring_key);
 
         let _event = RecurringPaymentEvent::RecurringPaymentPaused {
             recurring_id: recurring_id.clone(),
@@ -531,10 +541,9 @@ impl PaymentContract {
         }
 
         recurring.status = RecurringStatus::Active;
-        env.storage().persistent().set(
-            &StorageKey::RecurringPayment(recurring_id.clone()),
-            &recurring,
-        );
+        let recurring_key = StorageKey::RecurringPayment(recurring_id.clone());
+        env.storage().persistent().set(&recurring_key, &recurring);
+        extend_persistent_ttl(&env, &recurring_key);
 
         let _event = RecurringPaymentEvent::RecurringPaymentResumed {
             recurring_id: recurring_id.clone(),
@@ -560,10 +569,9 @@ impl PaymentContract {
         }
 
         recurring.status = RecurringStatus::Cancelled;
-        env.storage().persistent().set(
-            &StorageKey::RecurringPayment(recurring_id.clone()),
-            &recurring,
-        );
+        let recurring_key = StorageKey::RecurringPayment(recurring_id.clone());
+        env.storage().persistent().set(&recurring_key, &recurring);
+        extend_persistent_ttl(&env, &recurring_key);
 
         let _event = RecurringPaymentEvent::RecurringPaymentCancelled {
             recurring_id: recurring_id.clone(),
@@ -625,10 +633,9 @@ impl PaymentContract {
                         ))
                     {
                         recurring.status = RecurringStatus::Failed;
-                        env.storage().persistent().set(
-                            &StorageKey::RecurringPayment(recurring_id.clone()),
-                            &recurring,
-                        );
+                        let recurring_key = StorageKey::RecurringPayment(recurring_id.clone());
+                        env.storage().persistent().set(&recurring_key, &recurring);
+                        extend_persistent_ttl(&env, &recurring_key);
                         Self::add_failed_payment(&env, &recurring_id);
 
                         let _event = RecurringPaymentEvent::RecurringPaymentFailed {
@@ -692,10 +699,9 @@ impl PaymentContract {
         }
 
         recurring.status = RecurringStatus::Active;
-        env.storage().persistent().set(
-            &StorageKey::RecurringPayment(recurring_id.clone()),
-            &recurring,
-        );
+        let recurring_key = StorageKey::RecurringPayment(recurring_id.clone());
+        env.storage().persistent().set(&recurring_key, &recurring);
+        extend_persistent_ttl(&env, &recurring_key);
 
         Self::execute_recurring_payment_internal(&env, &recurring_id, true)
             .map_err(|_| Error::RecurringPaymentExecutionFailed)
@@ -745,9 +751,11 @@ impl PaymentContract {
             compounding,
         };
 
+        let late_fee_config_key = StorageKey::LateFeeConfig(agreement_id.clone());
         env.storage()
             .persistent()
-            .set(&StorageKey::LateFeeConfig(agreement_id.clone()), &config);
+            .set(&late_fee_config_key, &config);
+        extend_persistent_ttl(&env, &late_fee_config_key);
 
         crate::events::late_fee_config_set(
             &env,
@@ -848,9 +856,11 @@ impl PaymentContract {
             waive_reason: None,
         };
 
+        let late_fee_record_key = StorageKey::LateFeeRecord(payment_id.clone());
         env.storage()
             .persistent()
-            .set(&StorageKey::LateFeeRecord(payment_id.clone()), &record);
+            .set(&late_fee_record_key, &record);
+        extend_persistent_ttl(&env, &late_fee_record_key);
 
         crate::events::late_fee_applied(&env, payment_id, late_fee, days_over_grace);
 
@@ -901,9 +911,11 @@ impl PaymentContract {
         record.waive_reason = Some(reason.clone());
         record.total_due = record.base_amount; // remove late fee from total
 
+        let late_fee_record_key = StorageKey::LateFeeRecord(payment_id.clone());
         env.storage()
             .persistent()
-            .set(&StorageKey::LateFeeRecord(payment_id.clone()), &record);
+            .set(&late_fee_record_key, &record);
+        extend_persistent_ttl(&env, &late_fee_record_key);
 
         crate::events::late_fee_waived(&env, payment_id, reason);
 
@@ -935,10 +947,9 @@ impl PaymentContract {
             escalation_type,
         };
 
-        env.storage().persistent().set(
-            &StorageKey::RentEscalationConfig(agreement_id.clone()),
-            &config,
-        );
+        let escalation_key = StorageKey::RentEscalationConfig(agreement_id.clone());
+        env.storage().persistent().set(&escalation_key, &config);
+        extend_persistent_ttl(&env, &escalation_key);
 
         crate::events::rent_escalation_config_set(&env, agreement_id, annual_rate_bps);
 
