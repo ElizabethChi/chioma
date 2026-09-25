@@ -28,6 +28,12 @@ mod tests_rbac;
 #[cfg(test)]
 mod tests_property;
 
+#[cfg(test)]
+mod tests_support;
+
+#[cfg(test)]
+mod tests_dispute_resolution_integration;
+
 // Re-export public APIs
 pub use access::AccessControl;
 pub use dispute::DisputeHandler;
