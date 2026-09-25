@@ -284,5 +284,26 @@ describe('validateEnvironment', () => {
         }),
       ).toThrow(/STELLAR_ADMIN_SECRET_KEY/);
     });
+
+    it('accepts a valid single LOG_TRANSPORT (#1547)', () => {
+      expect(() =>
+        validateEnvironment({ ...validProduction, LOG_TRANSPORT: 'sentry' }),
+      ).not.toThrow();
+    });
+
+    it('accepts a valid comma-separated LOG_TRANSPORT list (#1547)', () => {
+      expect(() =>
+        validateEnvironment({
+          ...validProduction,
+          LOG_TRANSPORT: 'console, sentry',
+        }),
+      ).not.toThrow();
+    });
+
+    it('rejects an unknown LOG_TRANSPORT name, catching a typo at startup (#1547)', () => {
+      expect(() =>
+        validateEnvironment({ ...validProduction, LOG_TRANSPORT: 'sentr' }),
+      ).toThrow(/LOG_TRANSPORT/);
+    });
   });
 });
