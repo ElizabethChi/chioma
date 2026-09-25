@@ -32,6 +32,7 @@ vi.mock('@/lib/stellar-wallets-kit', () => ({
   StellarWalletsKit: {
     getAddress: vi.fn(),
     authModal: vi.fn(),
+    getNetwork: vi.fn(),
     signTransaction: vi.fn().mockResolvedValue({ signedTxXdr: 'signed-xdr' }),
   },
 }));
@@ -46,7 +47,21 @@ vi.mock('@/lib/stellar-auth', () => ({
 }));
 
 vi.mock('@/lib/stellar-network', () => ({
+  getConfiguredNetwork: vi.fn().mockReturnValue('TESTNET'),
+  getNetworkLabel: vi.fn((n: string) => (n === 'PUBLIC' ? 'Mainnet' : 'Testnet')),
   getNetworkPassphrase: vi.fn().mockReturnValue('Test Network'),
+  matchWalletNetwork: vi.fn(
+    (walletNetwork: { network: string; networkPassphrase: string } | null) => {
+      if (!walletNetwork) return { status: 'undetermined' };
+      if (walletNetwork.networkPassphrase === 'Test Network') {
+        return { status: 'match' };
+      }
+      return {
+        status: 'mismatch',
+        walletNetworkLabel: walletNetwork.network || 'a different network',
+      };
+    },
+  ),
 }));
 
 vi.mock('@/lib/navigation/detect-user-role', () => ({
@@ -78,6 +93,10 @@ describe('WalletConnectButton', () => {
     });
     vi.mocked(StellarWalletsKit.authModal).mockResolvedValue({
       address: 'GABC123',
+    });
+    vi.mocked(StellarWalletsKit.getNetwork).mockResolvedValue({
+      network: 'TESTNET',
+      networkPassphrase: 'Test Network',
     });
   });
 
@@ -208,5 +227,67 @@ describe('WalletConnectButton', () => {
     await waitFor(() => expect(screen.getByRole('button')).not.toBeDisabled());
     expect(toast.error).not.toHaveBeenCalled();
     expect(setTokens).not.toHaveBeenCalled();
+  });
+
+  describe('network mismatch guard', () => {
+    it('proceeds to sign when the wallet network matches the configured network', async () => {
+      render(<WalletConnectButton />);
+      fireEvent.click(screen.getByRole('button'));
+
+      await waitFor(() =>
+        expect(StellarWalletsKit.signTransaction).toHaveBeenCalled(),
+      );
+      expect(setTokens).toHaveBeenCalled();
+    });
+
+    it('blocks signing and shows an explanatory error on a detected network mismatch', async () => {
+      vi.mocked(StellarWalletsKit.getNetwork).mockResolvedValue({
+        network: 'PUBLIC',
+        networkPassphrase: 'Public Global Stellar Network ; September 2015',
+      });
+      const toast = (await import('react-hot-toast')).default;
+
+      render(<WalletConnectButton />);
+      fireEvent.click(screen.getByRole('button'));
+
+      await waitFor(() =>
+        expect(toast.error).toHaveBeenCalledWith(
+          "Your wallet is connected to PUBLIC, but this app is configured for Testnet. Switch your wallet's network before signing.",
+        ),
+      );
+      expect(StellarWalletsKit.signTransaction).not.toHaveBeenCalled();
+      expect(setTokens).not.toHaveBeenCalled();
+    });
+
+    it('blocks signing with a verification-failure message when the wallet does not support getNetwork (e.g. Albedo, xBull)', async () => {
+      vi.mocked(StellarWalletsKit.getNetwork).mockRejectedValue({
+        code: -3,
+        message: 'Albedo does not support the "getNetwork" function',
+      });
+      const toast = (await import('react-hot-toast')).default;
+
+      render(<WalletConnectButton />);
+      fireEvent.click(screen.getByRole('button'));
+
+      await waitFor(() =>
+        expect(toast.error).toHaveBeenCalledWith(
+          "Could not verify your wallet's network. This app is configured for Testnet — please confirm your wallet is on the same network before signing.",
+        ),
+      );
+      expect(StellarWalletsKit.signTransaction).not.toHaveBeenCalled();
+      expect(setTokens).not.toHaveBeenCalled();
+    });
+
+    it('re-enables the connect button after blocking on a mismatch', async () => {
+      vi.mocked(StellarWalletsKit.getNetwork).mockResolvedValue({
+        network: 'PUBLIC',
+        networkPassphrase: 'Public Global Stellar Network ; September 2015',
+      });
+
+      render(<WalletConnectButton />);
+      fireEvent.click(screen.getByRole('button'));
+
+      await waitFor(() => expect(screen.getByRole('button')).not.toBeDisabled());
+    });
   });
 });

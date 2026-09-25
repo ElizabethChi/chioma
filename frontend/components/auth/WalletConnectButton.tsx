@@ -10,7 +10,12 @@ import {
 } from '@/lib/stellar-wallets-kit';
 import toast from 'react-hot-toast';
 import { requestChallenge, verifySignature } from '@/lib/stellar-auth';
-import { getNetworkPassphrase } from '@/lib/stellar-network';
+import {
+  getConfiguredNetwork,
+  getNetworkLabel,
+  getNetworkPassphrase,
+  matchWalletNetwork,
+} from '@/lib/stellar-network';
 import { detectRoleFromWallet } from '@/lib/navigation/detect-user-role';
 import { clearEmailOnboardingSkip } from '@/hooks/useOnboardingGate';
 
@@ -88,6 +93,34 @@ export default function WalletConnectButton({
       });
       const challengeXdr = await requestChallenge(address);
       toast.dismiss('wallet-challenge');
+
+      // Verify the wallet is actually on the network this app is configured
+      // for before asking it to sign anything. Every module in the kit
+      // implements `getNetwork()` (it's a required part of `ModuleInterface`,
+      // not Freighter-specific), but some wallets — Albedo and xBull, at
+      // least — always reject it as unsupported. Signing is blocked in that
+      // "undetermined" case too: this check exists specifically to prevent
+      // an expensive mistake (signing a real transaction thinking it's a
+      // test one, or vice versa), so an inability to verify is treated the
+      // same as a verified mismatch rather than silently let through.
+      let walletNetwork: { network: string; networkPassphrase: string } | null;
+      try {
+        walletNetwork = await StellarWalletsKit.getNetwork();
+      } catch {
+        walletNetwork = null;
+      }
+
+      const networkMatch = matchWalletNetwork(walletNetwork);
+      if (networkMatch.status !== 'match') {
+        toast.dismiss('wallet-challenge');
+        const configuredLabel = getNetworkLabel(getConfiguredNetwork());
+        const message =
+          networkMatch.status === 'mismatch'
+            ? `Your wallet is connected to ${networkMatch.walletNetworkLabel}, but this app is configured for ${configuredLabel}. Switch your wallet's network before signing.`
+            : `Could not verify your wallet's network. This app is configured for ${configuredLabel} — please confirm your wallet is on the same network before signing.`;
+        toast.error(message);
+        return;
+      }
 
       // Sign Challenge
       toast.loading('Please sign the transaction in your wallet...', {
