@@ -441,7 +441,13 @@ const securitySchema = Joi.object({
 const loggingSchema = Joi.object({
   LOG_LEVEL: Joi.string().valid('debug', 'info', 'warn', 'error'),
   LOG_FORMAT: Joi.string().valid('simple', 'json'),
-  LOG_TRANSPORT: Joi.string(),
+  // Comma-separated list of transport names from resolveTransports's
+  // TRANSPORT_FACTORIES (logger.service.ts) - kept in sync with that map so
+  // a typo here fails fast at startup instead of silently falling back to
+  // console-only (#1547).
+  LOG_TRANSPORT: Joi.string().pattern(
+    /^\s*(console|file|sentry)\s*(,\s*(console|file|sentry)\s*)*$/,
+  ),
   LOG_FILE: Joi.string(),
   LOG_SLOW_REQUEST_THRESHOLD: Joi.number().min(0),
   LOG_SKIP_PATHS: Joi.string(),
