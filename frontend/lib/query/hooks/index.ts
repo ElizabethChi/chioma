@@ -15,14 +15,6 @@ export {
 } from './use-payments';
 
 export {
-  useNotificationsQuery,
-  useUnreadCount,
-  useMarkNotificationRead,
-  useMarkAllNotificationsRead,
-  useDeleteNotification,
-} from './use-notifications';
-
-export {
   useFavorites,
   useFavoriteStatus,
   useFavoriteCount,

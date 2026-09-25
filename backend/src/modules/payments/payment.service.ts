@@ -52,6 +52,7 @@ import { TransactionStatus } from '../stellar/entities/stellar-transaction.entit
 import { Idempotent, IdempotencyService } from '../../common/idempotency';
 import { FraudHooksService } from '../fraud/fraud-hooks.service';
 import { FxRateService } from './fx-rate.service';
+import { UsersService } from '../users/users.service';
 
 @Injectable()
 export class PaymentService {
@@ -70,6 +71,7 @@ export class PaymentService {
     private readonly idempotencyService: IdempotencyService,
     private readonly fraudHooksService: FraudHooksService,
     private readonly fxRateService: FxRateService,
+    private readonly usersService: UsersService,
   ) {}
 
   @Locked({
@@ -141,9 +143,16 @@ export class PaymentService {
     const transactionFee = dto.amount * 0.02;
     const netAmount = dto.amount - transactionFee;
 
-    // Note: In production, fetch actual user email from UsersService.findById(userId)
-    // For now, using userId as fallback since UsersService has unrelated type issues
-    const userEmail = `user_${userId}@chioma.local`;
+    const payingUser = await this.usersService.getUserById(userId);
+    if (!payingUser.email) {
+      this.logger.warn(
+        `Payment blocked for user ${userId}: no verified email on file, so gateway charge receipts cannot be sent.`,
+      );
+      throw new BadRequestException(
+        'A verified email address is required before making a payment',
+      );
+    }
+    const userEmail = payingUser.email;
 
     const decryptedMetadata = decryptMetadata(paymentMethod.encryptedMetadata);
 

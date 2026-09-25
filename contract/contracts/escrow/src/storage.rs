@@ -185,4 +185,18 @@ impl EscrowStorage {
     pub fn set_admin(env: &Env, admin: &Address) {
         env.storage().instance().set(&DataKey::SystemAdmin, admin);
     }
+
+    /// Whether the contract is globally paused (#1689).
+    /// Defaults to `false` (not paused) when never explicitly set.
+    pub fn is_paused(env: &Env) -> bool {
+        env.storage()
+            .instance()
+            .get(&DataKey::Paused)
+            .unwrap_or(false)
+    }
+
+    /// Set the contract's global paused flag.
+    pub fn set_paused(env: &Env, paused: bool) {
+        env.storage().instance().set(&DataKey::Paused, &paused);
+    }
 }
