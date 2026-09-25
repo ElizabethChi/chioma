@@ -31,6 +31,7 @@ const requiredDeployedExtras = {
   API_BASE_URL: 'https://api.chioma.app',
   CORS_ORIGINS: 'https://app.chioma.app',
   SECURITY_SESSION_SECRET: 'c'.repeat(32),
+  DEFAULT_ARBITER_ADDRESS: `G${'A'.repeat(55)}`,
 };
 
 const validProduction = {
@@ -205,6 +206,34 @@ describe('validateEnvironment', () => {
     });
 
     it('does not require deployed-tier vars in development', () => {
+      expect(() =>
+        validateEnvironment({
+          NODE_ENV: 'development',
+          ...baseRateLimits,
+          ...validJwt,
+        }),
+      ).not.toThrow();
+    });
+
+    it('rejects production missing DEFAULT_ARBITER_ADDRESS', () => {
+      expect(() =>
+        validateEnvironment({
+          ...validProduction,
+          DEFAULT_ARBITER_ADDRESS: undefined,
+        }),
+      ).toThrow(/DEFAULT_ARBITER_ADDRESS/);
+    });
+
+    it('rejects a malformed DEFAULT_ARBITER_ADDRESS in production', () => {
+      expect(() =>
+        validateEnvironment({
+          ...validProduction,
+          DEFAULT_ARBITER_ADDRESS: 'not-a-real-arbiter-address',
+        }),
+      ).toThrow(/DEFAULT_ARBITER_ADDRESS/);
+    });
+
+    it('does not require DEFAULT_ARBITER_ADDRESS in development', () => {
       expect(() =>
         validateEnvironment({
           NODE_ENV: 'development',

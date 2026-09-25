@@ -318,7 +318,7 @@ const stellarSchema = Joi.object({
   STELLAR_SERVER_SECRET_KEY: stellarSecretKey,
   STELLAR_ANCHOR_SECRET_KEY: stellarSecretKey,
   STELLAR_ENCRYPTION_KEY: Joi.string(),
-  DEFAULT_ARBITER_ADDRESS: stellarPublicKey,
+  DEFAULT_ARBITER_ADDRESS: requiredWhenDeployed(stellarPublicKey),
   PROTOCOL_WALLET_ADDRESS: stellarPublicKey,
   CHIOMA_CONTRACT_ID: contractId,
   ESCROW_CONTRACT_ID: contractId,
