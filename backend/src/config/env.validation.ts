@@ -363,7 +363,7 @@ const stellarSchema = Joi.object({
   STELLAR_SERVER_SECRET_KEY: stellarSecretKey,
   STELLAR_ANCHOR_SECRET_KEY: stellarSecretKey,
   STELLAR_ENCRYPTION_KEY: Joi.string(),
-  DEFAULT_ARBITER_ADDRESS: stellarPublicKey,
+  DEFAULT_ARBITER_ADDRESS: requiredWhenDeployed(stellarPublicKey),
   PROTOCOL_WALLET_ADDRESS: stellarPublicKey,
   CHIOMA_CONTRACT_ID: contractId,
   ESCROW_CONTRACT_ID: contractId,
@@ -379,6 +379,22 @@ const anchorSchema = Joi.object({
   ANCHOR_API_KEY: Joi.string(),
   ANCHOR_USDC_ASSET: Joi.string(),
   SUPPORTED_FIAT_CURRENCIES: Joi.string(),
+});
+
+const fxRateSchema = Joi.object({
+  FX_RATE_PROVIDER: Joi.string().valid('mock', 'external').default('mock'),
+  FX_RATE_PROVIDER_URL: Joi.string()
+    .uri()
+    .when('FX_RATE_PROVIDER', {
+      is: 'external',
+      then: Joi.required(),
+      otherwise: Joi.optional().allow(''),
+    }),
+  FX_RATE_PROVIDER_API_KEY: Joi.string().when('FX_RATE_PROVIDER', {
+    is: 'external',
+    then: Joi.required(),
+    otherwise: Joi.optional().allow(''),
+  }),
 });
 
 const storageSchema = Joi.object({
@@ -645,6 +661,7 @@ const additionalVarsSchema = appSchema
   .concat(searchSchema)
   .concat(stellarSchema)
   .concat(anchorSchema)
+  .concat(fxRateSchema)
   .concat(storageSchema)
   .concat(paymentSchema)
   .concat(emailSchema)

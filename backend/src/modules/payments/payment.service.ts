@@ -51,6 +51,7 @@ import {
 import { TransactionStatus } from '../stellar/entities/stellar-transaction.entity';
 import { Idempotent, IdempotencyService } from '../../common/idempotency';
 import { FraudHooksService } from '../fraud/fraud-hooks.service';
+import { FxRateService } from './fx-rate.service';
 import { UsersService } from '../users/users.service';
 
 @Injectable()
@@ -69,6 +70,7 @@ export class PaymentService {
     private readonly lockService: LockService,
     private readonly idempotencyService: IdempotencyService,
     private readonly fraudHooksService: FraudHooksService,
+    private readonly fxRateService: FxRateService,
     private readonly usersService: UsersService,
   ) {}
 
@@ -498,13 +500,38 @@ export class PaymentService {
   ): Promise<Payment> {
     ensureUserId(userId);
 
+    // FX conversion (#1543): when the caller supplies a fiat amount/currency
+    // instead of an already-converted XLM amount, resolve the settlement
+    // amount here — before any on-chain call — so a rate-lookup failure
+    // blocks settlement outright rather than surfacing after funds moved.
+    // `dto.amount` remains the on-chain XLM amount in every other case,
+    // matching this endpoint's pre-existing contract exactly.
+    let onChainAmount = dto.amount;
+    let fxMetadata: Partial<PaymentMetadata> = {};
+    if (dto.fiatCurrency && dto.fiatAmount) {
+      const { convertedAmount, rateResult } = await this.fxRateService.convert(
+        Number(dto.fiatAmount),
+        dto.fiatCurrency,
+        'XLM',
+      );
+      onChainAmount = convertedAmount.toString();
+      fxMetadata = {
+        fxFromCurrency: rateResult.fromCurrency,
+        fxToCurrency: rateResult.toCurrency,
+        fxRate: rateResult.rate,
+        fxRateSource: rateResult.source,
+        fxRateResolvedAt: rateResult.resolvedAt.toISOString(),
+        fxOriginalAmount: Number(dto.fiatAmount),
+      };
+    }
+
     let transactionHash: string;
     try {
       const callerKeypair = StellarSdk.Keypair.fromSecret(dto.userSecret);
       transactionHash = await this.paymentProcessingService.processRentPayment(
         dto.userAddress,
         dto.agreementId,
-        dto.amount,
+        onChainAmount,
         callerKeypair,
       );
     } catch (error) {
@@ -513,9 +540,9 @@ export class PaymentService {
       const failedPayment = this.paymentRepository.create({
         userId,
         agreementId: dto.agreementId,
-        amount: Number(dto.amount),
+        amount: Number(onChainAmount),
         transactionFee: 0,
-        netAmount: Number(dto.amount),
+        netAmount: Number(onChainAmount),
         currency: 'XLM',
         status: PaymentStatus.FAILED,
         processedAt: new Date(),
@@ -524,6 +551,7 @@ export class PaymentService {
           flow: 'rent',
           userAddress: dto.userAddress,
           error: error instanceof Error ? error.message : 'Payment failed',
+          ...fxMetadata,
         } as PaymentMetadata,
       });
       await this.paymentRepository.save(failedPayment);
@@ -534,9 +562,9 @@ export class PaymentService {
       const payment = this.paymentRepository.create({
         userId,
         agreementId: dto.agreementId,
-        amount: Number(dto.amount),
+        amount: Number(onChainAmount),
         transactionFee: 0,
-        netAmount: Number(dto.amount),
+        netAmount: Number(onChainAmount),
         currency: 'XLM',
         status: PaymentStatus.COMPLETED,
         referenceNumber: transactionHash,
@@ -547,6 +575,7 @@ export class PaymentService {
           transactionHash,
           userAddress: dto.userAddress,
           reconciledAt: new Date().toISOString(),
+          ...fxMetadata,
         } as PaymentMetadata,
       });
 
@@ -560,7 +589,7 @@ export class PaymentService {
       await this.notificationsService.notify(
         userId,
         'Stellar rent payment processed',
-        `Your rent payment of ${dto.amount} XLM was submitted successfully.`,
+        `Your rent payment of ${onChainAmount} XLM was submitted successfully.`,
         'PAYMENT_RECEIVED',
       );
       return saved;

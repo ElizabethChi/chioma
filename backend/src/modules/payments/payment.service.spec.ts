@@ -17,6 +17,7 @@ import { LockService } from '../../common/lock';
 import { REDIS_CLIENT } from '../../common/lock/redis-client.token';
 import { IdempotencyService } from '../../common/idempotency';
 import { FraudHooksService } from '../fraud/fraud-hooks.service';
+import { FxRateService } from './fx-rate.service';
 import { UsersService } from '../users/users.service';
 import {
   encryptMetadata,
@@ -87,6 +88,11 @@ const mockFraudHooksService = {
   checkListingBeforePublishing: jest.fn().mockResolvedValue(undefined),
 };
 
+const mockFxRateService = {
+  getRate: jest.fn(),
+  convert: jest.fn(),
+};
+
 describe('PaymentService', () => {
   let service: PaymentService;
   let paymentRepository: Repository<Payment>;
@@ -135,6 +141,10 @@ describe('PaymentService', () => {
         {
           provide: FraudHooksService,
           useValue: mockFraudHooksService,
+        },
+        {
+          provide: FxRateService,
+          useValue: mockFxRateService,
         },
       ],
     }).compile();
@@ -513,6 +523,7 @@ describe('PaymentService', () => {
           },
           { provide: StellarService, useValue: mockStellarService },
           { provide: FraudHooksService, useValue: mockFraudHooksService },
+          { provide: FxRateService, useValue: mockFxRateService },
           LockService,
           IdempotencyService,
           { provide: REDIS_CLIENT, useValue: null },
