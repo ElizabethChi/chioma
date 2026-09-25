@@ -336,6 +336,22 @@ const anchorSchema = Joi.object({
   SUPPORTED_FIAT_CURRENCIES: Joi.string(),
 });
 
+const fxRateSchema = Joi.object({
+  FX_RATE_PROVIDER: Joi.string().valid('mock', 'external').default('mock'),
+  FX_RATE_PROVIDER_URL: Joi.string()
+    .uri()
+    .when('FX_RATE_PROVIDER', {
+      is: 'external',
+      then: Joi.required(),
+      otherwise: Joi.optional().allow(''),
+    }),
+  FX_RATE_PROVIDER_API_KEY: Joi.string().when('FX_RATE_PROVIDER', {
+    is: 'external',
+    then: Joi.required(),
+    otherwise: Joi.optional().allow(''),
+  }),
+});
+
 const storageSchema = Joi.object({
   AWS_ACCESS_KEY_ID: requiredWhenDeployed(),
   AWS_SECRET_ACCESS_KEY: requiredWhenDeployed(),
@@ -594,6 +610,7 @@ const additionalVarsSchema = appSchema
   .concat(searchSchema)
   .concat(stellarSchema)
   .concat(anchorSchema)
+  .concat(fxRateSchema)
   .concat(storageSchema)
   .concat(paymentSchema)
   .concat(emailSchema)
