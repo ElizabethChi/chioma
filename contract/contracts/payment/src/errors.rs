@@ -55,6 +55,16 @@ pub enum PaymentError {
     PaymentNotLate = 34,
     /// Caller is not the landlord
     NotLandlord = 35,
+    /// Caller is not the contract admin
+    Unauthorized = 36,
+    /// Admin has not been configured yet
+    AdminNotSet = 37,
+    /// Admin has already been configured
+    AdminAlreadySet = 38,
+    /// Contract is globally paused; state-changing operations are blocked
+    ContractPaused = 39,
+    /// Contract is not currently paused
+    NotPaused = 40,
 }
 
 /// Pins every `PaymentError` discriminant so off-chain code that maps error
@@ -92,5 +102,10 @@ mod pin_tests {
         assert_eq!(PaymentError::InvalidLateFeePercentage as u32, 33);
         assert_eq!(PaymentError::PaymentNotLate as u32, 34);
         assert_eq!(PaymentError::NotLandlord as u32, 35);
+        assert_eq!(PaymentError::Unauthorized as u32, 36);
+        assert_eq!(PaymentError::AdminNotSet as u32, 37);
+        assert_eq!(PaymentError::AdminAlreadySet as u32, 38);
+        assert_eq!(PaymentError::ContractPaused as u32, 39);
+        assert_eq!(PaymentError::NotPaused as u32, 40);
     }
 }
