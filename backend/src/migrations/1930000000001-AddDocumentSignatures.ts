@@ -1,7 +1,7 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class AddDocumentSignatures1930000000000 implements MigrationInterface {
-  name = 'AddDocumentSignatures1930000000000';
+export class AddDocumentSignatures1930000000001 implements MigrationInterface {
+  name = 'AddDocumentSignatures1930000000001';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`

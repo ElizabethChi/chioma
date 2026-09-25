@@ -7,7 +7,7 @@ import {
   TableIndex,
 } from 'typeorm';
 
-export class AddPropertyVirtualTours1775000000000 implements MigrationInterface {
+export class AddPropertyVirtualTours1775000000001 implements MigrationInterface {
   public async up(queryRunner: QueryRunner): Promise<void> {
     const hasVirtualTourColumn = await queryRunner.hasColumn(
       'properties',

@@ -19,8 +19,8 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  * expression — a plain btree index on the raw column would not be used by
  * a query filtering on `LOWER(city) = ...`.
  */
-export class AddPropertySearchCompositeIndexes1930000000000 implements MigrationInterface {
-  name = 'AddPropertySearchCompositeIndexes1930000000000';
+export class AddPropertySearchCompositeIndexes1930000000002 implements MigrationInterface {
+  name = 'AddPropertySearchCompositeIndexes1930000000002';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     // Query shape 1 (dominant): status + city (case-insensitive) + price

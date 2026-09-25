@@ -1,6 +1,6 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class AddScanStatusToFileMetadata1930000000000 implements MigrationInterface {
+export class AddScanStatusToFileMetadata1930000000003 implements MigrationInterface {
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(`
       CREATE TYPE "file_metadata_scan_status_enum" AS ENUM ('pending', 'clean', 'quarantined')

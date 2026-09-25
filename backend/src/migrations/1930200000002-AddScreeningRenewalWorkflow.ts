@@ -1,7 +1,7 @@
 import { MigrationInterface, QueryRunner } from 'typeorm';
 
-export class AddScreeningRenewalWorkflow1930200000000 implements MigrationInterface {
-  name = 'AddScreeningRenewalWorkflow1930200000000';
+export class AddScreeningRenewalWorkflow1930200000002 implements MigrationInterface {
+  name = 'AddScreeningRenewalWorkflow1930200000002';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     // Add renewed_from_id column to tenant_screening_requests

@@ -48,6 +48,7 @@ const mockPaymentGateway = {
   chargePayment: jest.fn(),
   processRefund: jest.fn(),
   savePaymentMethod: jest.fn(),
+  tokenizePaymentMethod: jest.fn(),
 };
 
 const mockNotificationsService = {
@@ -641,6 +642,241 @@ describe('PaymentService', () => {
       expect(
         (createdPaymentMethod as Partial<PaymentMethod>)?.encryptedMetadata,
       ).toBeTruthy();
+    });
+
+    it('does not call the gateway and behaves unchanged for a non-card type with no gatewayReference (backward compatible)', async () => {
+      const dto: CreatePaymentMethodDto = {
+        paymentType: 'BANK_TRANSFER',
+        isDefault: false,
+        metadata: { bankName: 'Test Bank' },
+      };
+
+      (paymentMethodRepository.update as jest.Mock).mockResolvedValue({});
+      const createPaymentMethodMock = jest.spyOn(
+        paymentMethodRepository,
+        'create',
+      );
+      createPaymentMethodMock.mockImplementation(
+        (data: Partial<PaymentMethod>) => data as PaymentMethod,
+      );
+      (paymentMethodRepository.save as jest.Mock).mockResolvedValue({
+        id: 2,
+        ...dto,
+      });
+
+      const result = await service.createPaymentMethod(dto, 'user_1');
+
+      expect(mockPaymentGateway.tokenizePaymentMethod).not.toHaveBeenCalled();
+      expect(result.id).toBe(2);
+      const [createdPaymentMethod] =
+        createPaymentMethodMock.mock.calls[0] ?? [];
+      expect(
+        (createdPaymentMethod as Partial<PaymentMethod>)?.encryptedMetadata,
+      ).toBeNull();
+      expect(
+        (createdPaymentMethod as Partial<PaymentMethod>)?.lastFour,
+      ).toBeUndefined();
+    });
+
+    it('persists gateway-verified lastFour/expiryDate and stores the real token encrypted when tokenization succeeds, overriding client-claimed values', async () => {
+      process.env.PAYMENT_METADATA_SECRET = 'test-secret';
+      process.env.PAYMENT_GATEWAY = 'paystack';
+
+      const dto: CreatePaymentMethodDto = {
+        paymentType: 'CREDIT_CARD',
+        lastFour: '0000', // client-claimed — must be overridden
+        expiryDate: '2020-01-01', // client-claimed — must be overridden
+        isDefault: false,
+        gatewayReference: 'ref_real_charge',
+      };
+
+      mockPaymentGateway.tokenizePaymentMethod.mockResolvedValue({
+        success: true,
+        token: 'AUTH_realcode123',
+        last4: '4242',
+        expiryMonth: 12,
+        expiryYear: 2027,
+      });
+
+      (paymentMethodRepository.update as jest.Mock).mockResolvedValue({});
+      const createPaymentMethodMock = jest.spyOn(
+        paymentMethodRepository,
+        'create',
+      );
+      createPaymentMethodMock.mockImplementation(
+        (data: Partial<PaymentMethod>) => data as PaymentMethod,
+      );
+      (paymentMethodRepository.save as jest.Mock).mockImplementation(
+        (data: Partial<PaymentMethod>) => Promise.resolve({ id: 3, ...data }),
+      );
+
+      const result = await service.createPaymentMethod(dto, 'user_1');
+
+      expect(mockPaymentGateway.tokenizePaymentMethod).toHaveBeenCalledWith({
+        gatewayReference: 'ref_real_charge',
+        userEmail: 'user_user_1@chioma.local',
+      });
+      expect(result.id).toBe(3);
+      const [createdPaymentMethod] =
+        createPaymentMethodMock.mock.calls[0] ?? [];
+      const created = createdPaymentMethod as Partial<PaymentMethod>;
+      expect(created.lastFour).toBe('4242');
+      expect(created.expiryDate).toEqual(new Date('2027-12-01'));
+      expect(created.encryptedMetadata).toBeTruthy();
+
+      // The real token must be stored under the exact field name
+      // chargePaystack reads at charge time (`authorizationCode`), and only
+      // in the encrypted column — never the plain `metadata` jsonb column.
+      const decrypted = decryptMetadata(created.encryptedMetadata as string);
+      expect(decrypted?.authorizationCode).toBe('AUTH_realcode123');
+      expect(created.metadata).toEqual(null);
+
+      delete process.env.PAYMENT_GATEWAY;
+    });
+
+    it('does not persist anything and throws a clear error when tokenization fails', async () => {
+      process.env.PAYMENT_GATEWAY = 'paystack';
+
+      const dto: CreatePaymentMethodDto = {
+        paymentType: 'CREDIT_CARD',
+        isDefault: false,
+        gatewayReference: 'ref_bad',
+      };
+
+      mockPaymentGateway.tokenizePaymentMethod.mockResolvedValue({
+        success: false,
+        error: 'Paystack verification failed',
+      });
+
+      await expect(service.createPaymentMethod(dto, 'user_1')).rejects.toThrow(
+        BadRequestException,
+      );
+      await expect(service.createPaymentMethod(dto, 'user_1')).rejects.toThrow(
+        'Paystack verification failed',
+      );
+
+      expect(paymentMethodRepository.create).not.toHaveBeenCalled();
+      expect(paymentMethodRepository.save).not.toHaveBeenCalled();
+
+      delete process.env.PAYMENT_GATEWAY;
+    });
+
+    it('stores the token under Flutterwave field name ("token") when PAYMENT_GATEWAY=flutterwave', async () => {
+      process.env.PAYMENT_METADATA_SECRET = 'test-secret';
+      process.env.PAYMENT_GATEWAY = 'flutterwave';
+
+      const dto: CreatePaymentMethodDto = {
+        paymentType: 'CREDIT_CARD',
+        isDefault: false,
+        gatewayReference: 'flw-ref-1',
+      };
+
+      mockPaymentGateway.tokenizePaymentMethod.mockResolvedValue({
+        success: true,
+        token: 'flw_realtoken_xyz',
+        last4: '5555',
+        expiryMonth: 11,
+        expiryYear: 2028,
+      });
+
+      const createPaymentMethodMock = jest.spyOn(
+        paymentMethodRepository,
+        'create',
+      );
+      createPaymentMethodMock.mockImplementation(
+        (data: Partial<PaymentMethod>) => data as PaymentMethod,
+      );
+      (paymentMethodRepository.save as jest.Mock).mockImplementation(
+        (data: Partial<PaymentMethod>) => Promise.resolve({ id: 4, ...data }),
+      );
+
+      await service.createPaymentMethod(dto, 'user_1');
+
+      const [createdPaymentMethod] =
+        createPaymentMethodMock.mock.calls[0] ?? [];
+      const created = createdPaymentMethod as Partial<PaymentMethod>;
+      const decrypted = decryptMetadata(created.encryptedMetadata as string);
+      expect(decrypted?.token).toBe('flw_realtoken_xyz');
+      expect(decrypted?.authorizationCode).toBeUndefined();
+
+      delete process.env.PAYMENT_GATEWAY;
+    });
+  });
+
+  describe('createPaymentMethod -> chargePayment token consistency', () => {
+    it('a payment method tokenized via createPaymentMethod can be charged through the existing chargePayment/chargePaystack path using the stored token', async () => {
+      process.env.PAYMENT_METADATA_SECRET = 'test-secret';
+      process.env.PAYMENT_GATEWAY = 'paystack';
+
+      const dto: CreatePaymentMethodDto = {
+        paymentType: 'CREDIT_CARD',
+        isDefault: false,
+        gatewayReference: 'ref_real_charge',
+      };
+
+      mockPaymentGateway.tokenizePaymentMethod.mockResolvedValue({
+        success: true,
+        token: 'AUTH_realcode123',
+        last4: '4242',
+        expiryMonth: 12,
+        expiryYear: 2027,
+      });
+
+      const createPaymentMethodMock = jest.spyOn(
+        paymentMethodRepository,
+        'create',
+      );
+      createPaymentMethodMock.mockImplementation(
+        (data: Partial<PaymentMethod>) => data as PaymentMethod,
+      );
+      let savedMethod: PaymentMethod;
+      (paymentMethodRepository.save as jest.Mock).mockImplementation(
+        (data: Partial<PaymentMethod>) => {
+          savedMethod = { id: 5, ...data } as PaymentMethod;
+          return Promise.resolve(savedMethod);
+        },
+      );
+
+      const createdMethod = await service.createPaymentMethod(dto, 'user_1');
+
+      // Now simulate recordPayment's existing charge-by-saved-method flow:
+      // it looks up the method, decrypts encryptedMetadata, and passes it to
+      // chargePayment as decryptedMetadata — read the same way here.
+      const decrypted = decryptMetadata(createdMethod.encryptedMetadata);
+      expect(decrypted?.authorizationCode).toBe('AUTH_realcode123');
+
+      (paymentMethodRepository.findOne as jest.Mock).mockResolvedValue(
+        createdMethod,
+      );
+      mockPaymentGateway.chargePayment.mockResolvedValue({
+        success: true,
+        chargeId: 'charge_ok',
+      });
+      (paymentRepository.create as jest.Mock).mockImplementation(
+        (data: unknown) => data,
+      );
+      (paymentRepository.save as jest.Mock).mockResolvedValue({
+        id: 'payment_1',
+        status: PaymentStatus.COMPLETED,
+      });
+
+      await service.recordPayment(
+        {
+          amount: 100,
+          paymentMethodId: '5',
+        },
+        'user_1',
+      );
+
+      expect(mockPaymentGateway.chargePayment).toHaveBeenCalledWith(
+        expect.objectContaining({
+          decryptedMetadata: expect.objectContaining({
+            authorizationCode: 'AUTH_realcode123',
+          }),
+        }),
+      );
+
+      delete process.env.PAYMENT_GATEWAY;
     });
   });
 
