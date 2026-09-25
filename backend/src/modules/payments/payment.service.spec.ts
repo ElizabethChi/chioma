@@ -17,6 +17,7 @@ import { LockService } from '../../common/lock';
 import { REDIS_CLIENT } from '../../common/lock/redis-client.token';
 import { IdempotencyService } from '../../common/idempotency';
 import { FraudHooksService } from '../fraud/fraud-hooks.service';
+import { UsersService } from '../users/users.service';
 import {
   encryptMetadata,
   decryptMetadata,
@@ -112,7 +113,7 @@ describe('PaymentService', () => {
           useValue: mockNotificationsService,
         },
         {
-          provide: Object,
+          provide: UsersService,
           useValue: mockUsersService,
         },
         {
@@ -145,6 +146,10 @@ describe('PaymentService', () => {
     paymentMethodRepository = module.get<Repository<PaymentMethod>>(
       getRepositoryToken(PaymentMethod),
     );
+
+    mockUsersService.getUserById.mockResolvedValue({
+      email: 'test@example.com',
+    });
   });
 
   afterEach(() => {
@@ -330,6 +335,68 @@ describe('PaymentService', () => {
       });
     });
 
+    it('charges the gateway using the real user email from UsersService, not a synthesized one', async () => {
+      (paymentRepository.findOne as jest.Mock).mockResolvedValue(null);
+      (paymentMethodRepository.findOne as jest.Mock).mockResolvedValue({
+        id: 1,
+        userId: 'user_1',
+        encryptedMetadata: null,
+      });
+      mockUsersService.getUserById.mockResolvedValue({
+        email: 'real-user@example.com',
+      });
+      mockPaymentGateway.chargePayment.mockResolvedValue({
+        success: true,
+        chargeId: 'charge_1',
+      });
+      (paymentRepository.create as jest.Mock).mockImplementation(
+        (data: Partial<Payment>) => data as Payment,
+      );
+      (paymentRepository.save as jest.Mock).mockResolvedValue({
+        id: 'pay_1',
+        amount: 100,
+        currency: 'NGN',
+        paymentMethod: 'card',
+      });
+
+      const dto: CreatePaymentRecordDto = {
+        agreementId: 'agreement_1',
+        amount: 100,
+        paymentMethodId: '1',
+      };
+
+      await service.recordPayment(dto, 'user_1');
+
+      expect(mockUsersService.getUserById).toHaveBeenCalledWith('user_1');
+      expect(mockPaymentGateway.chargePayment).toHaveBeenCalledWith(
+        expect.objectContaining({ userEmail: 'real-user@example.com' }),
+      );
+    });
+
+    it('rejects the payment when the user has no email on file, instead of charging a synthesized address', async () => {
+      (paymentRepository.findOne as jest.Mock).mockResolvedValue(null);
+      (paymentMethodRepository.findOne as jest.Mock).mockResolvedValue({
+        id: 1,
+        userId: 'user_1',
+        encryptedMetadata: null,
+      });
+      mockUsersService.getUserById.mockResolvedValue({ email: null });
+
+      const dto: CreatePaymentRecordDto = {
+        agreementId: 'agreement_1',
+        amount: 100,
+        paymentMethodId: '1',
+      };
+
+      await expect(service.recordPayment(dto, 'user_1')).rejects.toThrow(
+        BadRequestException,
+      );
+      await expect(service.recordPayment(dto, 'user_1')).rejects.toThrow(
+        'A verified email address is required before making a payment',
+      );
+      expect(mockPaymentGateway.chargePayment).not.toHaveBeenCalled();
+    });
+
     it('applies transaction fee and net amount calculation for rent payment', async () => {
       (paymentRepository.findOne as jest.Mock).mockResolvedValue(null);
       (paymentMethodRepository.findOne as jest.Mock).mockResolvedValue({
@@ -439,7 +506,7 @@ describe('PaymentService', () => {
           },
           { provide: PaymentGatewayService, useValue: mockPaymentGateway },
           { provide: NotificationsService, useValue: mockNotificationsService },
-          { provide: Object, useValue: mockUsersService },
+          { provide: UsersService, useValue: mockUsersService },
           {
             provide: PaymentProcessingService,
             useValue: mockPaymentProcessingService,
