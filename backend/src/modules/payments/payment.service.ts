@@ -380,6 +380,49 @@ export class PaymentService {
   ): Promise<PaymentMethod> {
     ensureUserId(userId);
 
+    let lastFour = dto.lastFour;
+    let expiryDate = dto.expiryDate;
+    let sensitiveMetadata = dto.sensitiveMetadata;
+
+    if (dto.gatewayReference) {
+      // Never trust client-supplied lastFour/expiryDate/token for a
+      // tokenized method — re-verify the reference against the real gateway
+      // and only persist what the gateway itself confirms.
+      const userEmail = `user_${userId}@chioma.local`;
+      const tokenizeResult = await this.paymentGateway.tokenizePaymentMethod({
+        gatewayReference: dto.gatewayReference,
+        userEmail,
+      });
+
+      if (!tokenizeResult.success || !tokenizeResult.token) {
+        throw new BadRequestException(
+          tokenizeResult.error ||
+            'Payment method could not be verified with the payment gateway',
+        );
+      }
+
+      lastFour = tokenizeResult.last4 ?? lastFour;
+      expiryDate =
+        tokenizeResult.expiryMonth && tokenizeResult.expiryYear
+          ? `${tokenizeResult.expiryYear}-${String(tokenizeResult.expiryMonth).padStart(2, '0')}-01`
+          : expiryDate;
+
+      // The gateway-confirmed token is sensitive and must never land in the
+      // plain `metadata` jsonb column; merge it into sensitiveMetadata so it
+      // goes through the same encryptMetadata() path as other secrets. The
+      // field name (authorizationCode for Paystack, token for Flutterwave)
+      // must match what chargePaystack/chargeFlutterwave read at charge time.
+      const tokenField =
+        this.gatewayTokenFieldName() === 'authorizationCode'
+          ? { authorizationCode: tokenizeResult.token }
+          : { token: tokenizeResult.token };
+
+      sensitiveMetadata = {
+        ...(sensitiveMetadata ?? {}),
+        ...tokenField,
+      };
+    }
+
     if (dto.isDefault) {
       await this.paymentMethodRepository.update(
         { userId, isDefault: true },
@@ -387,21 +430,34 @@ export class PaymentService {
       );
     }
 
-    const encryptedMetadata = dto.sensitiveMetadata
-      ? encryptMetadata(dto.sensitiveMetadata)
+    const encryptedMetadata = sensitiveMetadata
+      ? encryptMetadata(sensitiveMetadata)
       : null;
 
     const paymentMethod = this.paymentMethodRepository.create({
       userId,
       paymentType: dto.paymentType,
-      lastFour: dto.lastFour,
-      expiryDate: dto.expiryDate ? new Date(dto.expiryDate) : undefined,
+      lastFour,
+      expiryDate: expiryDate ? new Date(expiryDate) : undefined,
       isDefault: dto.isDefault ?? false,
       metadata: dto.metadata ?? null,
       encryptedMetadata,
     });
 
     return this.paymentMethodRepository.save(paymentMethod);
+  }
+
+  /**
+   * The field name chargePaystack/chargeFlutterwave read from stored
+   * (encrypted) metadata to charge a saved method: `authorizationCode` for
+   * Paystack, `token` for Flutterwave (see payment-gateway.service.ts).
+   * createPaymentMethod must write under the same key it will later be read
+   * from, keyed off the same PAYMENT_GATEWAY env var the gateway service
+   * itself dispatches on.
+   */
+  private gatewayTokenFieldName(): 'authorizationCode' | 'token' {
+    const gateway = (process.env.PAYMENT_GATEWAY || 'mock').toLowerCase();
+    return gateway === 'flutterwave' ? 'token' : 'authorizationCode';
   }
 
   async updatePaymentMethod(
